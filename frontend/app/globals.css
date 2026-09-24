@@ -1,0 +1,62 @@
+@import "tailwindcss";
+
+:root {
+  --mc-brand: #6d3a5b;
+  --mc-brand-dark: #4d2941;
+  --mc-rose: #b86b87;
+
+  --mc-background: #fbf8f7;
+  --mc-surface: #ffffff;
+
+  --mc-text: #211c1f;
+  --mc-muted: #756d72;
+
+  --mc-border: #e9e1e4;
+
+  --mc-success: #4f8068;
+  --mc-warning: #b27a3a;
+  --mc-danger: #b85c62;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--mc-background);
+  color: var(--mc-text);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+aside form {
+  min-height: 0;
+}
+
+aside form > div[class*="flex-1"] {
+  min-height: 0;
+}
+
+aside > div[class*="flex-1"],
+aside > div[class*="flex-1"] > div[class*="flex-1"] {
+  min-height: 0;
+}
+
+::selection {
+  background: rgba(109, 58, 91, 0.16);
+}
