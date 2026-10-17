@@ -47,6 +47,30 @@ class TaskResponse(ORMResponse):
 	completed_at: datetime | None
 
 
+class TaskCreate(BaseModel):
+	patient_id: int
+	title: str
+	owner_id: int | None = None
+	owner_patient_id: int | None = None
+	due_date: date
+	category: str
+	actor_caregiver_id: int
+
+
+class TaskUpdate(BaseModel):
+	title: str | None = None
+	owner_id: int | None = None
+	owner_patient_id: int | None = None
+	due_date: date | None = None
+	category: str | None = None
+	actor_caregiver_id: int
+
+
+class TaskCompletion(BaseModel):
+	actor_caregiver_id: int
+	completed: bool = True
+
+
 class AppointmentResponse(ORMResponse):
 	id: int
 	patient_id: int
@@ -56,6 +80,31 @@ class AppointmentResponse(ORMResponse):
 	appointment_date: date
 	appointment_time: time
 	status: str
+
+
+class AppointmentCreate(BaseModel):
+	patient_id: int
+	title: str
+	clinician_name: str
+	location: str
+	appointment_date: date
+	appointment_time: time
+	status: str = "Confirmed"
+	actor_caregiver_id: int
+
+
+class AppointmentUpdate(BaseModel):
+	title: str | None = None
+	clinician_name: str | None = None
+	location: str | None = None
+	appointment_date: date | None = None
+	appointment_time: time | None = None
+	status: str | None = None
+	actor_caregiver_id: int
+
+
+class AppointmentAction(BaseModel):
+	actor_caregiver_id: int
 
 
 class CareHandoffResponse(ORMResponse):
@@ -68,6 +117,27 @@ class CareHandoffResponse(ORMResponse):
 	status: str
 	created_at: datetime
 	acknowledged_at: datetime | None
+
+
+class CareHandoffCreate(BaseModel):
+	patient_id: int
+	title: str
+	from_caregiver_id: int
+	to_caregiver_id: int
+	reason: str
+	actor_caregiver_id: int
+
+
+class CareHandoffActor(BaseModel):
+	actor_caregiver_id: int
+
+
+class PermissionUpdate(BaseModel):
+	patient_id: int
+	caregiver_id: int
+	permission_name: str
+	enabled: bool
+	actor_caregiver_id: int
 
 
 class ConsentRecordResponse(ORMResponse):

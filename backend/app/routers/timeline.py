@@ -1,14 +1,26 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import TimelineEvent
 from ..schemas import TimelineEventResponse
+from ..services.access_service import get_active_caregiver, require_permission
 
 router = APIRouter(prefix="/api/timeline", tags=["timeline"])
 
 
 @router.get("", response_model=list[TimelineEventResponse])
-def list_timeline_events(db: Session = Depends(get_db)) -> list[TimelineEvent]:
-	return list(db.scalars(select(TimelineEvent).order_by(TimelineEvent.event_date, TimelineEvent.id)).all())
+def list_timeline_events(
+	actor_caregiver_id: int = Query(...),
+	db: Session = Depends(get_db),
+) -> list[TimelineEvent]:
+	actor = get_active_caregiver(db, actor_caregiver_id)
+	require_permission(db, actor, "Approved care updates")
+	return list(
+		db.scalars(
+			select(TimelineEvent)
+			.where(TimelineEvent.patient_id == actor.patient_id)
+			.order_by(TimelineEvent.event_date, TimelineEvent.id)
+		).all()
+	)

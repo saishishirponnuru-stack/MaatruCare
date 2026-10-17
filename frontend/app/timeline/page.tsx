@@ -239,7 +239,7 @@ export default function TimelinePage() {
       status: "Recorded",
     }));
 
-    return [...sharedEvents, ...events].filter((event) => {
+    return sharedEvents.filter((event) => {
       if (event.phase !== phase) return false;
       if (filter === "All") return true;
       return event.type === filterToType[filter];

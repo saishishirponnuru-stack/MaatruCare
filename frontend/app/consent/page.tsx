@@ -124,6 +124,7 @@ export default function ConsentPage() {
     useState<CaregiverName>("Rahul Rao");
   const [statuses, setStatuses] =
     useState<Record<CaregiverName, AccessStatus>>(initialStatuses);
+  const [feedback, setFeedback] = useState("");
 
   const summary = useMemo(() => {
     const activeCaregivers = caregivers.filter(
@@ -157,17 +158,18 @@ export default function ConsentPage() {
     (permission) => permissions[selectedCaregiver][permission],
   ).length;
 
-  function togglePermission(permission: PermissionKey) {
+  async function togglePermission(permission: PermissionKey) {
     if (selectedIsRevoked) return;
-
-    updateConsentPermission(selectedCaregiver, permission, !permissions[selectedCaregiver][permission]);
+    try {
+      await updateConsentPermission(selectedCaregiver, permission, !permissions[selectedCaregiver][permission]);
+      setFeedback("Permission updated and persisted.");
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : "Unable to update permission.");
+    }
   }
 
   function revokeSelectedAccess() {
-    setStatuses((current) => ({
-      ...current,
-      [selectedCaregiver]: "Revoked",
-    }));
+    setFeedback("Full caregiver revocation is not available in the current backend. Revoke individual permissions instead.");
   }
 
   return (
@@ -203,6 +205,7 @@ export default function ConsentPage() {
             or revoke sharing permissions at any time.
           </p>
         </motion.div>
+        {feedback && <div className="mt-5 rounded-[12px] border border-[#E4D7DF] bg-white px-3 py-2 text-xs font-medium text-[#6D3A5B]">{feedback}</div>}
 
         <section className="mt-8">
           <SectionHeading eyebrow="Sharing overview" title="Your sharing at a glance" />

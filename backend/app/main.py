@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .database import Base, engine
-from .routers import appointments, caregivers, handoffs, patients, tasks, timeline
+from .routers import appointments, caregivers, handoffs, patients, permissions, tasks, timeline
 
 Base.metadata.create_all(bind=engine)
 
@@ -12,7 +12,7 @@ app.add_middleware(
 	CORSMiddleware,
 	allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
 	allow_credentials=True,
-	allow_methods=["GET"],
+	allow_methods=["GET", "POST", "PUT"],
 	allow_headers=["*"],
 )
 
@@ -27,4 +27,5 @@ app.include_router(caregivers.router)
 app.include_router(tasks.router)
 app.include_router(appointments.router)
 app.include_router(handoffs.router)
+app.include_router(permissions.router)
 app.include_router(timeline.router)
