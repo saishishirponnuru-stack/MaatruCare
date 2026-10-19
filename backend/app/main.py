@@ -1,10 +1,38 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .database import Base, engine
-from .routers import appointments, caregivers, handoffs, patients, permissions, tasks, timeline
+from .database import Base, SessionLocal, engine
+from .models import Patient, Caregiver
+from .routers import (
+    appointments,
+    caregivers,
+    handoffs,
+    patients,
+    permissions,
+    tasks,
+    timeline,
+)
 
 Base.metadata.create_all(bind=engine)
+
+
+def initialize_demo_data() -> None:
+    """Initialize sample data only when the database is empty."""
+    db = SessionLocal()
+
+    try:
+        if db.query(Patient).first() is not None:
+            return
+
+        if db.query(Caregiver).first() is not None:
+            return
+
+        from .seed import seed_database
+
+        seed_database()
+    finally:
+        db.close()
+
 
 app = FastAPI(title="MaatruCare API")
 
@@ -21,9 +49,14 @@ app.add_middleware(
 )
 
 
+@app.on_event("startup")
+def startup_event() -> None:
+    initialize_demo_data()
+
+
 @app.get("/api/health")
 def health() -> dict[str, str]:
-	return {"status": "ok", "service": "MaatruCare API"}
+    return {"status": "ok", "service": "MaatruCare API"}
 
 
 app.include_router(patients.router)
