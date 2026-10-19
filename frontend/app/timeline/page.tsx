@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import AppShell from "@/components/layout/AppShell";
 import { motion } from "framer-motion";
@@ -387,9 +387,9 @@ export default function TimelinePage() {
                               <p className="mt-1 text-[10px] text-[#9A9196]">
                                 {event.person ?? event.source}
                                 {event.person && event.source
-                                  ? ` · ${event.source}`
+                                  ? ` Â· ${event.source}`
                                   : ""}
-                                {event.time ? ` · ${event.time}` : ""}
+                                {event.time ? ` Â· ${event.time}` : ""}
                               </p>
                             </div>
                           </div>
@@ -442,7 +442,7 @@ export default function TimelinePage() {
                             </span>
                           ) : null}
 
-                          {event.title === "Care status verified" ? (
+                          {false ? (
                             <span className="flex items-center gap-1 text-[10px] text-[#9A9196]">
                               <UserRound size={12} />
                               Clinician-documented
@@ -473,3 +473,4 @@ export default function TimelinePage() {
     </AppShell>
   );
 }
+
