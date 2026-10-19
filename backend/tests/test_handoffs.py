@@ -113,3 +113,89 @@ def test_handoff_audit_rows_are_non_sensitive(client: TestClient, db_session) ->
 	assert all(row.resource_type == "CareHandoff" for row in rows)
 	events = db_session.scalars(select(TimelineEvent).where(TimelineEvent.source == "Care handoff", TimelineEvent.title.in_(["Care handoff prepared", "Care handoff sent", "Care handoff acknowledged"]))).all()
 	assert [event.title for event in events[-3:]] == ["Care handoff prepared", "Care handoff sent", "Care handoff acknowledged"]
+
+
+def test_handoff_completion_lifecycle(client: TestClient, db_session) -> None:
+        enable_handoff_access(client)
+        created = client.post(
+                "/api/handoffs",
+                json={
+                        "patient_id": 1,
+                        "title": "Complete transport coordination",
+                        "from_caregiver_id": 1,
+                        "to_caregiver_id": 2,
+                        "reason": "Confirm responsibility transfer",
+                        "actor_caregiver_id": 1,
+                },
+        )
+        assert created.status_code == 201
+        handoff_id = created.json()["id"]
+
+        premature = client.post(
+                f"/api/handoffs/{handoff_id}/complete",
+                json={"actor_caregiver_id": 2},
+        )
+        assert premature.status_code == 409
+
+        sent = client.post(
+                f"/api/handoffs/{handoff_id}/send",
+                json={"actor_caregiver_id": 1},
+        )
+        assert sent.status_code == 200
+
+        acknowledged = client.post(
+                f"/api/handoffs/{handoff_id}/acknowledge",
+                json={"actor_caregiver_id": 2},
+        )
+        assert acknowledged.status_code == 200
+
+        completed = client.post(
+                f"/api/handoffs/{handoff_id}/complete",
+                json={"actor_caregiver_id": 2},
+        )
+        assert completed.status_code == 200
+        assert completed.json()["status"] == "Completed"
+
+        duplicate = client.post(
+                f"/api/handoffs/{handoff_id}/complete",
+                json={"actor_caregiver_id": 2},
+        )
+        assert duplicate.status_code == 409
+
+        rows = db_session.scalars(
+                select(AuditLog)
+                .where(AuditLog.resource_id == handoff_id)
+                .order_by(AuditLog.id)
+        ).all()
+        assert [row.action for row in rows][-1] == "handoff_completed"
+
+
+def test_handoff_completion_rejects_non_recipient(client: TestClient) -> None:
+        enable_handoff_access(client)
+        created = client.post(
+                "/api/handoffs",
+                json={
+                        "patient_id": 1,
+                        "title": "Recipient authorization test",
+                        "from_caregiver_id": 1,
+                        "to_caregiver_id": 2,
+                        "reason": "Verify recipient-only completion",
+                        "actor_caregiver_id": 1,
+                },
+        )
+        handoff_id = created.json()["id"]
+
+        client.post(
+                f"/api/handoffs/{handoff_id}/send",
+                json={"actor_caregiver_id": 1},
+        )
+        client.post(
+                f"/api/handoffs/{handoff_id}/acknowledge",
+                json={"actor_caregiver_id": 2},
+        )
+
+        response = client.post(
+                f"/api/handoffs/{handoff_id}/complete",
+                json={"actor_caregiver_id": 1},
+        )
+        assert response.status_code == 403

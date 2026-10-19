@@ -180,5 +180,6 @@ export const api = {
   createHandoff: (payload: ApiHandoffCreate) => request<ApiHandoff>("/api/handoffs", { method: "POST", body: JSON.stringify(payload) }),
   sendHandoff: (id: number) => request<ApiHandoff>(`/api/handoffs/${id}/send`, { method: "POST", body: JSON.stringify({ actor_caregiver_id: DEMO_ACTOR_CAREGIVER_ID }) }),
   acknowledgeHandoff: (id: number, actorCaregiverId: number) => request<ApiHandoff>(`/api/handoffs/${id}/acknowledge`, { method: "POST", body: JSON.stringify({ actor_caregiver_id: actorCaregiverId }) }),
+  completeHandoff: (id: number, actorCaregiverId: number) => request<ApiHandoff>(`/api/handoffs/${id}/complete`, { method: "POST", body: JSON.stringify({ actor_caregiver_id: actorCaregiverId }) }),
   updatePermission: (payload: ApiPermissionUpdate) => request<ApiPermission>("/api/permissions", { method: "PUT", body: JSON.stringify(payload) }),
 };

@@ -145,3 +145,46 @@ def list_handoffs_for_actor(db: Session, actor_caregiver_id: int, patient_id: in
 	if patient_id is not None and patient_id != caregiver.patient_id:
 		raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Caregiver cannot access this patient")
 	return list(db.scalars(query.order_by(CareHandoff.id)).all())
+
+
+def complete_handoff(db: Session, handoff_id: int, actor_caregiver_id: int) -> CareHandoff:
+        handoff = _get_handoff(db, handoff_id)
+        actor = _require_actor(db, handoff, actor_caregiver_id)
+        require_permission(db, actor, "Care handoffs")
+
+        if actor.id != handoff.to_caregiver_id:
+                raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Only the receiving caregiver can complete this handoff",
+                )
+
+        if handoff.status != ACKNOWLEDGED:
+                raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="Only an acknowledged handoff can be completed",
+                )
+
+        try:
+                handoff.status = "Completed"
+                record_audit(
+                        db,
+                        patient_id=handoff.patient_id,
+                        actor_name=actor.name,
+                        action="handoff_completed",
+                        resource_id=handoff.id,
+                )
+                record_timeline_event(
+                        db,
+                        patient_id=handoff.patient_id,
+                        event_type="Coordination",
+                        title="Care handoff completed",
+                        description="The receiving caregiver completed the acknowledged coordination handoff.",
+                        source="Care handoff",
+                )
+                db.commit()
+                db.refresh(handoff)
+        except Exception:
+                db.rollback()
+                raise
+
+        return handoff

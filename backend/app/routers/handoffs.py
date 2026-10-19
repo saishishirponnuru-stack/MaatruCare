@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+﻿from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -6,7 +6,8 @@ from ..models import CareHandoff
 from ..schemas import CareHandoffActor, CareHandoffCreate, CareHandoffResponse
 from ..services.handoff_service import (
 	acknowledge_handoff,
-	create_handoff,
+	create_handoff,
+        complete_handoff,
 	get_handoff_for_actor,
 	list_handoffs_for_actor,
 	send_handoff,
@@ -48,3 +49,13 @@ def send_handoff_route(handoff_id: int, payload: CareHandoffActor, db: Session =
 @router.post("/{handoff_id}/acknowledge", response_model=CareHandoffResponse)
 def acknowledge_handoff_route(handoff_id: int, payload: CareHandoffActor, db: Session = Depends(get_db)) -> CareHandoff:
 	return acknowledge_handoff(db, handoff_id, payload.actor_caregiver_id)
+
+@router.post("/{handoff_id}/complete", response_model=CareHandoffResponse)
+def complete_handoff_route(
+        handoff_id: int,
+        payload: CareHandoffActor,
+        db: Session = Depends(get_db),
+) -> CareHandoff:
+        return complete_handoff(db, handoff_id, payload.actor_caregiver_id)
+
+

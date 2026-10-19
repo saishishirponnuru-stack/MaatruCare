@@ -104,7 +104,7 @@ export default function CareCirclePage() {
             whileHover={{ y: -1 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => {
-              setFeedback("Caregiver invitations are demo-only in this session.");
+              setFeedback("Demo only — no invitation email is sent and no new account is created.");
               window.setTimeout(() => setFeedback(""), 2600);
             }}
             className="flex items-center justify-center gap-2 rounded-[13px] bg-[#6D3A5B] px-4 py-2.5 text-xs font-semibold text-white shadow-sm"

@@ -95,7 +95,7 @@ export function MaatruCareDemoProvider({ children }: { children: ReactNode }) {
   function mapHandoff(handoff: ApiHandoff, caregivers: ApiCaregiver[]): DemoHandoff {
     const from = caregiverName(handoff.from_caregiver_id, caregivers) ?? "Ananya Rao";
     const to = caregiverName(handoff.to_caregiver_id, caregivers) ?? "Ananya Rao";
-    const stage: DemoHandoffStage = handoff.status === "Prepared" ? "Prepared" : handoff.status === "Acknowledged" ? "Acknowledged" : "Sent";
+    const stage: DemoHandoffStage = handoff.status === "Completed" ? "Completed" : handoff.status === "Prepared" ? "Prepared" : handoff.status === "Acknowledged" ? "Acknowledged" : handoff.status === "Awaiting acknowledgement" ? "Sent" : "Sent";
     return {
       id: String(handoff.id),
       title: handoff.title,
@@ -132,27 +132,71 @@ export function MaatruCareDemoProvider({ children }: { children: ReactNode }) {
     return mapped;
   }
 
-  async function refresh() {
-    setLoading(true);
-    try {
-      const [caregivers, apiTasks, apiHandoffs, apiTimeline, apiPermissions] = await Promise.all([
-        api.getCaregivers(),
-        api.getTasks(),
-        api.getHandoffs(),
-        api.getTimeline(),
-        api.getPermissions(),
-      ]);
-      setTasks(apiTasks.map((task) => mapTask(task, caregivers)));
-      setHandoffs(apiHandoffs.map((handoff) => mapHandoff(handoff, caregivers)));
-      setTimeline(apiTimeline.map(mapTimelineEvent));
-      setPermissions(mapPermissions(apiPermissions, caregivers));
-      setError("");
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to load coordination data.");
-    } finally {
-      setLoading(false);
+ async function refresh() {
+  setLoading(true);
+
+  const errors: string[] = [];
+
+  try {
+    const caregivers = await api.getCaregivers();
+
+    const results = await Promise.allSettled([
+      api.getTasks(),
+      api.getHandoffs(),
+      api.getTimeline(),
+      api.getPermissions(),
+    ]);
+
+    const [
+      tasksResult,
+      handoffsResult,
+      timelineResult,
+      permissionsResult,
+    ] = results;
+
+    if (tasksResult.status === "fulfilled") {
+      setTasks(
+        tasksResult.value.map((task) => mapTask(task, caregivers))
+      );
+    } else {
+      errors.push("Tasks could not be loaded.");
     }
+
+    if (handoffsResult.status === "fulfilled") {
+      setHandoffs(
+        handoffsResult.value.map((handoff) =>
+          mapHandoff(handoff, caregivers)
+        )
+      );
+    } else {
+      errors.push("Care handoffs could not be loaded.");
+    }
+
+    if (timelineResult.status === "fulfilled") {
+      setTimeline(timelineResult.value.map(mapTimelineEvent));
+    } else {
+      errors.push("Timeline access is unavailable.");
+    }
+
+    if (permissionsResult.status === "fulfilled") {
+      setPermissions(
+        mapPermissions(permissionsResult.value, caregivers)
+      );
+    } else {
+      errors.push("Consent permissions could not be loaded.");
+    }
+
+    setError(errors.join(" "));
+  } catch (cause) {
+    setError(
+      cause instanceof Error
+        ? cause.message
+        : "Unable to load coordination data."
+    );
+  } finally {
+    setLoading(false);
   }
+}
 
   useEffect(() => {
     const handle = window.setTimeout(() => { void refresh(); }, 0);
@@ -191,66 +235,84 @@ export function MaatruCareDemoProvider({ children }: { children: ReactNode }) {
   async function sendHandoff(id: string) { await api.sendHandoff(Number(id)); await refresh(); }
   async function acknowledgeHandoff(id: string) {
     const handoff = handoffs.find((item) => item.id === id);
-    const caregiverIds: Record<DemoOwner, number> = { "Ananya Rao": DEMO_ACTOR_CAREGIVER_ID, "Rahul Rao": 1, "Lakshmi Rao": 2, "Priya Rao": 3 };
     if (!handoff) throw new Error("Handoff not found.");
     await api.acknowledgeHandoff(Number(id), caregiverIds[handoff.to]);
     await refresh();
   }
-  async function updateConsentPermission(
-  caregiver: DemoOwner,
-  permission: PermissionName,
-  enabled: boolean
-) {
-  const caregiverIds: Record<DemoOwner, number> = {
-    "Ananya Rao": DEMO_ACTOR_CAREGIVER_ID,
-    "Rahul Rao": 1,
-    "Lakshmi Rao": 2,
-    "Priya Rao": 3,
-  };
-
-  setError("");
-
-  try {
-    await api.updatePermission({
-      patient_id: DEMO_PATIENT_ID,
-      caregiver_id: caregiverIds[caregiver],
-      permission_name: permission,
-      enabled,
-      actor_caregiver_id: DEMO_ACTOR_CAREGIVER_ID,
-    });
-
+  async function completeHandoff(id: string) {
+    const handoff = handoffs.find((item) => item.id === id);
+    if (!handoff) throw new Error("Handoff not found.");
+    await api.completeHandoff(Number(id), caregiverIds[handoff.to]);
     await refresh();
-  } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Unable to update permission.";
-
-    setError(message);
-    throw error;
   }
-}
+  async function updateConsentPermission (
+    caregiver: DemoOwner,
+    permission: PermissionName,
+    enabled: boolean
+  ) {
+    if (caregiver === "Ananya Rao") {
+      throw new Error("Patient permissions cannot be managed as caregiver permissions.");
+    }
 
-  const value = useMemo(() => ({
-    tasks,
-    handoffs,
-    timeline,
-    permissions,
-    loading,
-    error,
-    addTask,
-    updateTask,
-    completeTask,
-    reassignTask,
-    createHandoff,
-    sendHandoff,
-    acknowledgeHandoff,
-    requestHandoffChanges: () => unsupportedMutation("Handoff review requests are not supported by the backend yet."),
-    completeHandoff: () => unsupportedMutation("Handoff completion is not supported by the backend yet."),
-    addTimelineEvent: () => unsupportedMutation("Timeline events are recorded by backend mutations."),
-    updateConsentPermission,
-  }), [tasks, handoffs, timeline, permissions, loading, error]);
-  return <DemoContext.Provider value={value}>{children}</DemoContext.Provider>;
+    const caregiverIds: Record<Exclude<DemoOwner, "Ananya Rao">, number> = {
+      "Rahul Rao": 1,
+      "Lakshmi Rao": 2,
+      "Priya Rao": 3,
+    };
+
+    setError("");
+
+    try {
+      await api.updatePermission({
+        patient_id: DEMO_PATIENT_ID,
+        caregiver_id: caregiverIds[caregiver],
+        permission_name: permission,
+        enabled,
+        actor_caregiver_id: DEMO_ACTOR_CAREGIVER_ID,
+      });
+
+      setPermissions((previous) => ({
+        ...previous,
+        [caregiver]: {
+          ...previous[caregiver],
+          [permission]: enabled,
+        },
+      }));
+
+      await refresh();
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Unable to update permission.";
+
+      setError(message);
+      throw error;
+    }
+  }
+
+const value = useMemo(() => ({
+  tasks,
+  handoffs,
+  timeline,
+  permissions,
+  loading,
+  error,
+  addTask,
+  updateTask,
+  completeTask,
+  reassignTask,
+  createHandoff,
+  sendHandoff,
+  acknowledgeHandoff,
+  requestHandoffChanges: () => unsupportedMutation("Handoff review requests are not supported by the backend yet."),
+  completeHandoff,
+  addTimelineEvent: () => unsupportedMutation("Timeline events are recorded by backend mutations."),
+  updateConsentPermission,
+}), [tasks, handoffs, timeline, permissions, loading, error]);
+return (
+    <DemoContext.Provider value={value}>{children}</DemoContext.Provider>
+  );
 }
 
 export function useMaatruCareDemo() {
