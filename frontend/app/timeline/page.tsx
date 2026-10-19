@@ -229,15 +229,32 @@ export default function TimelinePage() {
   const [filter, setFilter] = useState<Filter>("All");
 
   const visibleEvents = useMemo(() => {
-    const sharedEvents: TimelineEvent[] = timeline.map((event) => ({
-      id: event.id,
-      phase: "Pregnancy",
-      date: "2026-09-24",
-      title: event.title,
-      type: "Coordination",
-      description: event.description,
-      status: "Recorded",
-    }));
+    const sharedEvents: TimelineEvent[] = timeline.map((event) => {
+      const eventDate = event.time;
+      const title = event.title.toLowerCase();
+
+      const eventType: EventType =
+        /appointment|clinic visit/.test(title) ? "Appointment" :
+        /task|documents folder/.test(title) ? "Task" :
+        /sharing|care status|consent|verified/.test(title) ? "Care update" :
+        "Coordination";
+
+      const phase: Phase =
+        eventDate < "2026-06-01" ? "Preconception" :
+        eventDate < "2026-10-01" ? "Pregnancy" :
+        eventDate < "2026-11-01" ? "Postnatal" :
+        "Early motherhood";
+
+      return {
+        id: event.id,
+        phase,
+        date: eventDate,
+        title: event.title,
+        type: eventType,
+        description: event.description,
+        status: "Recorded",
+      };
+    });
 
     return sharedEvents.filter((event) => {
       if (event.phase !== phase) return false;
@@ -473,4 +490,5 @@ export default function TimelinePage() {
     </AppShell>
   );
 }
+
 
