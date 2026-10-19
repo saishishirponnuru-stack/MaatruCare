@@ -327,7 +327,22 @@ export default function CareCirclePage() {
                         return (
                             <button
                             key={permission}
-                            onClick={() => void updateConsentPermission(caregiverName, permission, !enabled)}
+                            onClick={async () => {
+    try {
+        await updateConsentPermission(
+            caregiverName,
+            permission,
+            !enabled
+        );
+        setFeedback("Permission updated successfully.");
+    } catch (error) {
+        setFeedback(
+            error instanceof Error
+                ? error.message
+                : "Unable to update permission."
+        );
+    }
+}}
                             className="flex w-full items-center justify-between rounded-[14px] border border-[#E9E1E4] px-4 py-3 text-left transition hover:bg-[#FBF8F7]"
                             >
                             <span className="text-xs font-medium text-[#211C1F]">

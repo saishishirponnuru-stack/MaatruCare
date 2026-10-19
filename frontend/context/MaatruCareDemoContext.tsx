@@ -196,11 +196,40 @@ export function MaatruCareDemoProvider({ children }: { children: ReactNode }) {
     await api.acknowledgeHandoff(Number(id), caregiverIds[handoff.to]);
     await refresh();
   }
-  async function updateConsentPermission(caregiver: DemoOwner, permission: PermissionName, enabled: boolean) {
-    const caregiverIds: Record<DemoOwner, number> = { "Ananya Rao": DEMO_ACTOR_CAREGIVER_ID, "Rahul Rao": 1, "Lakshmi Rao": 2, "Priya Rao": 3 };
-    await api.updatePermission({ patient_id: DEMO_PATIENT_ID, caregiver_id: caregiverIds[caregiver], permission_name: permission, enabled, actor_caregiver_id: DEMO_ACTOR_CAREGIVER_ID });
+  async function updateConsentPermission(
+  caregiver: DemoOwner,
+  permission: PermissionName,
+  enabled: boolean
+) {
+  const caregiverIds: Record<DemoOwner, number> = {
+    "Ananya Rao": DEMO_ACTOR_CAREGIVER_ID,
+    "Rahul Rao": 1,
+    "Lakshmi Rao": 2,
+    "Priya Rao": 3,
+  };
+
+  setError("");
+
+  try {
+    await api.updatePermission({
+      patient_id: DEMO_PATIENT_ID,
+      caregiver_id: caregiverIds[caregiver],
+      permission_name: permission,
+      enabled,
+      actor_caregiver_id: DEMO_ACTOR_CAREGIVER_ID,
+    });
+
     await refresh();
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Unable to update permission.";
+
+    setError(message);
+    throw error;
   }
+}
 
   const value = useMemo(() => ({
     tasks,
