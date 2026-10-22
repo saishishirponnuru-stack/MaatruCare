@@ -1,14 +1,71 @@
 ﻿"use client";
 
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { api, DEMO_ACTOR_CAREGIVER_ID, DEMO_PATIENT_ID, type ApiCaregiver, type ApiHandoff, type ApiPermission, type ApiTask, type ApiTimelineEvent } from "@/lib/api";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 
-export type DemoOwner = "Ananya Rao" | "Rahul Rao" | "Lakshmi Rao" | "Priya Rao";
-export type DemoCategory = "Appointment" | "Transport" | "Patient" | "Coordination";
+import {
+  api,
+  DEMO_ACTOR_CAREGIVER_ID,
+  DEMO_PATIENT_ID,
+  type ApiCaregiver,
+  type ApiHandoff,
+  type ApiPermission,
+  type ApiTask,
+  type ApiTimelineEvent,
+} from "@/lib/api";
+
+export type DemoOwner =
+  | "Ananya Rao"
+  | "Rahul Rao"
+  | "Lakshmi Rao"
+  | "Priya Rao";
+
+export type DemoCategory =
+  | "Appointment"
+  | "Transport"
+  | "Patient"
+  | "Coordination";
+
 export type DemoTaskStatus = "Open" | "Completed";
-export type DemoTask = { id: string; title: string; owner: DemoOwner; dueDate: string; category: DemoCategory; status: DemoTaskStatus; note: string; createdBy: string };
-export type DemoHandoffStage = "Prepared" | "Sent" | "Reviewed" | "Acknowledged" | "Completed" | "Needs review";
-export type DemoHandoff = { id: string; title: string; from: DemoOwner; to: DemoOwner; reason: string; task: string; contexts: string[]; stage: DemoHandoffStage; created: string; clarification?: string };
+
+export type DemoTask = {
+  id: string;
+  title: string;
+  owner: DemoOwner;
+  dueDate: string;
+  category: DemoCategory;
+  status: DemoTaskStatus;
+  note: string;
+  createdBy: string;
+};
+
+export type DemoHandoffStage =
+  | "Prepared"
+  | "Sent"
+  | "Reviewed"
+  | "Acknowledged"
+  | "Completed"
+  | "Needs review";
+
+export type DemoHandoff = {
+  id: string;
+  title: string;
+  from: DemoOwner;
+  to: DemoOwner;
+  reason: string;
+  task: string;
+  contexts: string[];
+  stage: DemoHandoffStage;
+  created: string;
+  clarification?: string;
+};
+
 export type DemoTimelineEvent = {
   id: string;
   title: string;
@@ -18,33 +75,38 @@ export type DemoTimelineEvent = {
   eventType: string;
   source?: string;
 };
-export type PermissionName = "Appointments" | "Coordination tasks" | "Care handoffs" | "Approved care updates";
-export type DemoPermissions = Record<DemoOwner, Record<PermissionName, boolean>>;
 
-const owners: DemoOwner[] = ["Ananya Rao", "Rahul Rao", "Lakshmi Rao", "Priya Rao"];
+export type PermissionName =
+  | "Appointments"
+  | "Coordination tasks"
+  | "Care handoffs"
+  | "Approved care updates";
 
-const initialTasks: DemoTask[] = [
-  { id: "task-1", title: "Prepare appointment documents", owner: "Rahul Rao", dueDate: "2026-09-28", category: "Appointment", status: "Open", note: "Keep approved documents ready for the upcoming visit.", createdBy: "Ananya Rao" },
-  { id: "task-2", title: "Confirm transport", owner: "Lakshmi Rao", dueDate: "2026-09-28", category: "Transport", status: "Open", note: "Confirm transport for the 28 September appointment.", createdBy: "Ananya Rao" },
-  { id: "task-3", title: "Review appointment details", owner: "Ananya Rao", dueDate: "2026-09-27", category: "Patient", status: "Open", note: "Check time, location and shared appointment information.", createdBy: "Ananya Rao" },
-  { id: "task-4", title: "Confirm caregiver availability", owner: "Priya Rao", dueDate: "2026-09-30", category: "Coordination", status: "Open", note: "Confirm who can support around the scheduled visit.", createdBy: "Ananya Rao" },
+export type DemoPermissions = Record<
+  DemoOwner,
+  Record<PermissionName, boolean>
+>;
+
+const owners: DemoOwner[] = [
+  "Ananya Rao",
+  "Rahul Rao",
+  "Lakshmi Rao",
+  "Priya Rao",
 ];
 
-const initialHandoffs: DemoHandoff[] = [{ id: "handoff-1", title: "Appointment coordination", from: "Rahul Rao", to: "Lakshmi Rao", reason: "Transport and appointment coordination responsibility", task: "Confirm transport; Prepare appointment documents", contexts: ["Appointment details", "Coordination task details"], stage: "Sent", created: "26 Sep" }];
-
-const initialTimeline: DemoTimelineEvent[] = [
-  { id: "activity-1", title: "Appointment coordination updated", description: "Upcoming visit details are confirmed.", time: "18 min ago" },
-  { id: "activity-2", title: "Transport responsibility assigned", description: "Lakshmi is coordinating transport.", time: "42 min ago" },
-  { id: "activity-3", title: "Care handoff acknowledged", description: "Appointment coordination is with Lakshmi.", time: "1 hr ago" },
-  { id: "activity-4", title: "Consent permission updated", description: "Rahul can view approved care updates.", time: "Yesterday" },
+const initialHandoffs: DemoHandoff[] = [
+  {
+    id: "handoff-1",
+    title: "Appointment coordination",
+    from: "Rahul Rao",
+    to: "Lakshmi Rao",
+    reason: "Transport and appointment coordination responsibility",
+    task: "Confirm transport; Prepare appointment documents",
+    contexts: ["Appointment details", "Coordination task details"],
+    stage: "Sent",
+    created: "26 Sep",
+  },
 ];
-
-const initialPermissions: DemoPermissions = {
-  "Ananya Rao": { Appointments: true, "Coordination tasks": true, "Care handoffs": true, "Approved care updates": true },
-  "Rahul Rao": { Appointments: true, "Coordination tasks": true, "Care handoffs": true, "Approved care updates": true },
-  "Lakshmi Rao": { Appointments: true, "Coordination tasks": true, "Care handoffs": false, "Approved care updates": true },
-  "Priya Rao": { Appointments: false, "Coordination tasks": true, "Care handoffs": false, "Approved care updates": true },
-};
 
 const initialHandoff: DemoHandoff = initialHandoffs[0];
 
@@ -55,55 +117,148 @@ export type MaatruCareDemoContextValue = {
   permissions: DemoPermissions;
   loading: boolean;
   error: string;
-  addTask: (task: Omit<DemoTask, "id" | "status" | "createdBy">) => Promise<void>;
-  updateTask: (id: string, patch: Partial<DemoTask>) => Promise<void>;
+
+  addTask: (
+    task: Omit<DemoTask, "id" | "status" | "createdBy">
+  ) => Promise<void>;
+
+  updateTask: (
+    id: string,
+    patch: Partial<DemoTask>
+  ) => Promise<void>;
+
   completeTask: (id: string) => Promise<void>;
-  reassignTask: (id: string, owner: DemoOwner) => Promise<void>;
-  createHandoff: (handoff: Omit<DemoHandoff, "id" | "stage" | "created">) => Promise<string>;
+
+  reassignTask: (
+    id: string,
+    owner: DemoOwner
+  ) => Promise<void>;
+
+  createHandoff: (
+    handoff: Omit<DemoHandoff, "id" | "stage" | "created">
+  ) => Promise<string>;
+
   sendHandoff: (id: string) => Promise<void>;
   acknowledgeHandoff: (id: string) => Promise<void>;
-  requestHandoffChanges: (id: string, clarification: string) => Promise<void>;
+
+  requestHandoffChanges: (
+    id: string,
+    clarification: string
+  ) => Promise<void>;
+
   completeHandoff: (id: string) => Promise<void>;
-  addTimelineEvent: (title: string, description: string) => void;
-  updateConsentPermission: (caregiver: DemoOwner, permission: PermissionName, enabled: boolean) => Promise<void>;
+
+  addTimelineEvent: (
+    title: string,
+    description: string
+  ) => void;
+
+  updateConsentPermission: (
+    caregiver: DemoOwner,
+    permission: PermissionName,
+    enabled: boolean
+  ) => Promise<void>;
 };
 
-const DemoContext = createContext<MaatruCareDemoContextValue | null>(null);
+const DemoContext =
+  createContext<MaatruCareDemoContextValue | null>(null);
 
-export function MaatruCareDemoProvider({ children }: { children: ReactNode }) {
+export function MaatruCareDemoProvider({
+  children,
+}: {
+  children: ReactNode;
+}) {
   const [tasks, setTasks] = useState<DemoTask[]>([]);
   const [handoffs, setHandoffs] = useState<DemoHandoff[]>([]);
   const [timeline, setTimeline] = useState<DemoTimelineEvent[]>([]);
-  const [permissions, setPermissions] = useState<DemoPermissions>({
-    "Ananya Rao": { Appointments: false, "Coordination tasks": false, "Care handoffs": false, "Approved care updates": false },
-    "Rahul Rao": { Appointments: false, "Coordination tasks": false, "Care handoffs": false, "Approved care updates": false },
-    "Lakshmi Rao": { Appointments: false, "Coordination tasks": false, "Care handoffs": false, "Approved care updates": false },
-    "Priya Rao": { Appointments: false, "Coordination tasks": false, "Care handoffs": false, "Approved care updates": false },
-  });
+
+  const [permissions, setPermissions] =
+    useState<DemoPermissions>({
+      "Ananya Rao": {
+        Appointments: false,
+        "Coordination tasks": false,
+        "Care handoffs": false,
+        "Approved care updates": false,
+      },
+      "Rahul Rao": {
+        Appointments: false,
+        "Coordination tasks": false,
+        "Care handoffs": false,
+        "Approved care updates": false,
+      },
+      "Lakshmi Rao": {
+        Appointments: false,
+        "Coordination tasks": false,
+        "Care handoffs": false,
+        "Approved care updates": false,
+      },
+      "Priya Rao": {
+        Appointments: false,
+        "Coordination tasks": false,
+        "Care handoffs": false,
+        "Approved care updates": false,
+      },
+    });
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  function caregiverName(id: number | null, caregivers: ApiCaregiver[]) {
-    return caregivers.find((caregiver) => caregiver.id === id)?.name as DemoOwner | undefined;
+  function caregiverName(
+    id: number | null,
+    caregivers: ApiCaregiver[]
+  ): DemoOwner | undefined {
+    return caregivers.find(
+      (caregiver) => caregiver.id === id
+    )?.name as DemoOwner | undefined;
   }
 
-  function mapTask(task: ApiTask, caregivers: ApiCaregiver[]): DemoTask {
+  function mapTask(
+    task: ApiTask,
+    caregivers: ApiCaregiver[]
+  ): DemoTask {
     return {
       id: String(task.id),
       title: task.title,
-      owner: caregiverName(task.owner_id, caregivers) ?? "Ananya Rao",
+      owner:
+        caregiverName(task.owner_id, caregivers) ??
+        "Ananya Rao",
       dueDate: task.due_date,
       category: task.category as DemoCategory,
-      status: task.status === "Completed" ? "Completed" : "Open",
+      status:
+        task.status === "Completed" ? "Completed" : "Open",
       note: "Persisted coordination task.",
       createdBy: "MaatruCare",
     };
   }
 
-  function mapHandoff(handoff: ApiHandoff, caregivers: ApiCaregiver[]): DemoHandoff {
-    const from = caregiverName(handoff.from_caregiver_id, caregivers) ?? "Ananya Rao";
-    const to = caregiverName(handoff.to_caregiver_id, caregivers) ?? "Ananya Rao";
-    const stage: DemoHandoffStage = handoff.status === "Completed" ? "Completed" : handoff.status === "Prepared" ? "Prepared" : handoff.status === "Acknowledged" ? "Acknowledged" : handoff.status === "Awaiting acknowledgement" ? "Sent" : "Sent";
+  function mapHandoff(
+    handoff: ApiHandoff,
+    caregivers: ApiCaregiver[]
+  ): DemoHandoff {
+    const from =
+      caregiverName(
+        handoff.from_caregiver_id,
+        caregivers
+      ) ?? "Ananya Rao";
+
+    const to =
+      caregiverName(
+        handoff.to_caregiver_id,
+        caregivers
+      ) ?? "Ananya Rao";
+
+    const stage: DemoHandoffStage =
+      handoff.status === "Completed"
+        ? "Completed"
+        : handoff.status === "Prepared"
+          ? "Prepared"
+          : handoff.status === "Acknowledged"
+            ? "Acknowledged"
+            : handoff.status ===
+                "Awaiting acknowledgement"
+              ? "Sent"
+              : "Sent";
+
     return {
       id: String(handoff.id),
       title: handoff.title,
@@ -113,163 +268,322 @@ export function MaatruCareDemoProvider({ children }: { children: ReactNode }) {
       task: "Coordination responsibility",
       contexts: [],
       stage,
-      created: new Date(handoff.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" }),
+      created: new Date(
+        handoff.created_at
+      ).toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "short",
+      }),
     };
   }
 
-function mapTimelineEvent(event: ApiTimelineEvent): DemoTimelineEvent {
-  return {
-    id: String(event.id),
-    title: event.title,
-    description: event.description ?? event.event_type,
-    time: new Date(event.event_date).toLocaleDateString("en-GB", {
-      day: "numeric",
-      month: "short",
-    }),
-    eventDate: String(event.event_date).slice(0, 10),
-    eventType: event.event_type,
-    source: event.source ?? undefined,
-  };
-}
+  // Preserve the actual API date and event type.
+  function mapTimelineEvent(
+    event: ApiTimelineEvent
+  ): DemoTimelineEvent {
+    return {
+      id: String(event.id),
+      title: event.title,
+      description:
+        event.description ?? event.event_type,
+      time: new Date(
+        event.event_date
+      ).toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "short",
+      }),
+      eventDate: String(event.event_date).slice(0, 10),
+      eventType: event.event_type,
+      source: event.source ?? undefined,
+    };
   }
 
-  function mapPermissions(records: ApiPermission[], caregivers: ApiCaregiver[]): DemoPermissions {
+  function mapPermissions(
+    records: ApiPermission[],
+    caregivers: ApiCaregiver[]
+  ): DemoPermissions {
     const mapped: DemoPermissions = {
-      "Ananya Rao": { Appointments: false, "Coordination tasks": false, "Care handoffs": false, "Approved care updates": false },
-      "Rahul Rao": { Appointments: false, "Coordination tasks": false, "Care handoffs": false, "Approved care updates": false },
-      "Lakshmi Rao": { Appointments: false, "Coordination tasks": false, "Care handoffs": false, "Approved care updates": false },
-      "Priya Rao": { Appointments: false, "Coordination tasks": false, "Care handoffs": false, "Approved care updates": false },
+      "Ananya Rao": {
+        Appointments: false,
+        "Coordination tasks": false,
+        "Care handoffs": false,
+        "Approved care updates": false,
+      },
+      "Rahul Rao": {
+        Appointments: false,
+        "Coordination tasks": false,
+        "Care handoffs": false,
+        "Approved care updates": false,
+      },
+      "Lakshmi Rao": {
+        Appointments: false,
+        "Coordination tasks": false,
+        "Care handoffs": false,
+        "Approved care updates": false,
+      },
+      "Priya Rao": {
+        Appointments: false,
+        "Coordination tasks": false,
+        "Care handoffs": false,
+        "Approved care updates": false,
+      },
     };
+
     records.forEach((record) => {
-      const name = caregiverName(record.caregiver_id, caregivers);
-      if (name && owners.includes(name)) mapped[name][record.permission_name as PermissionName] = record.enabled;
+      const name = caregiverName(
+        record.caregiver_id,
+        caregivers
+      );
+
+      if (name && owners.includes(name)) {
+        mapped[name][
+          record.permission_name as PermissionName
+        ] = record.enabled;
+      }
     });
+
     return mapped;
   }
 
- async function refresh() {
-  setLoading(true);
+  async function refresh() {
+    setLoading(true);
 
-  const errors: string[] = [];
+    const errors: string[] = [];
 
-  try {
-    const caregivers = await api.getCaregivers();
+    try {
+      const caregivers = await api.getCaregivers();
 
-    const results = await Promise.allSettled([
-      api.getTasks(),
-      api.getHandoffs(),
-      api.getTimeline(),
-      api.getPermissions(),
-    ]);
+      const results = await Promise.allSettled([
+        api.getTasks(),
+        api.getHandoffs(),
+        api.getTimeline(),
+        api.getPermissions(),
+      ]);
 
-    const [
-      tasksResult,
-      handoffsResult,
-      timelineResult,
-      permissionsResult,
-    ] = results;
+      const [
+        tasksResult,
+        handoffsResult,
+        timelineResult,
+        permissionsResult,
+      ] = results;
 
-    if (tasksResult.status === "fulfilled") {
-      setTasks(
-        tasksResult.value.map((task) => mapTask(task, caregivers))
+      if (tasksResult.status === "fulfilled") {
+        setTasks(
+          tasksResult.value.map((task) =>
+            mapTask(task, caregivers)
+          )
+        );
+      } else {
+        errors.push("Tasks could not be loaded.");
+      }
+
+      if (handoffsResult.status === "fulfilled") {
+        setHandoffs(
+          handoffsResult.value.map((handoff) =>
+            mapHandoff(handoff, caregivers)
+          )
+        );
+      } else {
+        errors.push(
+          "Care handoffs could not be loaded."
+        );
+      }
+
+      if (timelineResult.status === "fulfilled") {
+        setTimeline(
+          timelineResult.value.map(mapTimelineEvent)
+        );
+      } else {
+        errors.push(
+          "Timeline access is unavailable."
+        );
+      }
+
+      if (permissionsResult.status === "fulfilled") {
+        setPermissions(
+          mapPermissions(
+            permissionsResult.value,
+            caregivers
+          )
+        );
+      } else {
+        errors.push(
+          "Consent permissions could not be loaded."
+        );
+      }
+
+      setError(errors.join(" "));
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Unable to load coordination data."
       );
-    } else {
-      errors.push("Tasks could not be loaded.");
+    } finally {
+      setLoading(false);
     }
-
-    if (handoffsResult.status === "fulfilled") {
-      setHandoffs(
-        handoffsResult.value.map((handoff) =>
-          mapHandoff(handoff, caregivers)
-        )
-      );
-    } else {
-      errors.push("Care handoffs could not be loaded.");
-    }
-
-    if (timelineResult.status === "fulfilled") {
-      setTimeline(timelineResult.value.map(mapTimelineEvent));
-    } else {
-      errors.push("Timeline access is unavailable.");
-    }
-
-    if (permissionsResult.status === "fulfilled") {
-      setPermissions(
-        mapPermissions(permissionsResult.value, caregivers)
-      );
-    } else {
-      errors.push("Consent permissions could not be loaded.");
-    }
-
-    setError(errors.join(" "));
-  } catch (cause) {
-    setError(
-      cause instanceof Error
-        ? cause.message
-        : "Unable to load coordination data."
-    );
-  } finally {
-    setLoading(false);
   }
-}
 
   useEffect(() => {
-    const handle = window.setTimeout(() => { void refresh(); }, 0);
+    const handle = window.setTimeout(
+      () => {
+        void refresh();
+      },
+      0
+    );
+
     return () => window.clearTimeout(handle);
   }, []);
 
-  async function unsupportedMutation(message: string): Promise<never> {
+  async function unsupportedMutation(
+    message: string
+  ): Promise<never> {
     setError(message);
     throw new Error(message);
   }
-  const caregiverIds: Record<DemoOwner, number> = { "Ananya Rao": DEMO_ACTOR_CAREGIVER_ID, "Rahul Rao": 1, "Lakshmi Rao": 2, "Priya Rao": 3 };
-  async function addTask(task: Omit<DemoTask, "id" | "status" | "createdBy">) {
-    await api.createTask({ patient_id: DEMO_PATIENT_ID, title: task.title, owner_id: caregiverIds[task.owner], due_date: task.dueDate, category: task.category, actor_caregiver_id: DEMO_ACTOR_CAREGIVER_ID });
+
+  const caregiverIds: Record<DemoOwner, number> = {
+    "Ananya Rao": DEMO_ACTOR_CAREGIVER_ID,
+    "Rahul Rao": 1,
+    "Lakshmi Rao": 2,
+    "Priya Rao": 3,
+  };
+
+  async function addTask(
+    task: Omit<DemoTask, "id" | "status" | "createdBy">
+  ) {
+    await api.createTask({
+      patient_id: DEMO_PATIENT_ID,
+      title: task.title,
+      owner_id: caregiverIds[task.owner],
+      due_date: task.dueDate,
+      category: task.category,
+      actor_caregiver_id: DEMO_ACTOR_CAREGIVER_ID,
+    });
+
     await refresh();
   }
-  async function updateTask(id: string, patch: Partial<DemoTask>) {
-    await api.updateTask(Number(id), { title: patch.title, owner_id: patch.owner ? caregiverIds[patch.owner] : undefined, due_date: patch.dueDate, category: patch.category, actor_caregiver_id: DEMO_ACTOR_CAREGIVER_ID });
+
+  async function updateTask(
+    id: string,
+    patch: Partial<DemoTask>
+  ) {
+    await api.updateTask(Number(id), {
+      title: patch.title,
+      owner_id: patch.owner
+        ? caregiverIds[patch.owner]
+        : undefined,
+      due_date: patch.dueDate,
+      category: patch.category,
+      actor_caregiver_id: DEMO_ACTOR_CAREGIVER_ID,
+    });
+
     await refresh();
   }
+
   async function completeTask(id: string) {
     const task = tasks.find((item) => item.id === id);
-    if (!task) throw new Error("Task not found.");
-    await api.completeTask(Number(id), task.status !== "Completed");
+
+    if (!task) {
+      throw new Error("Task not found.");
+    }
+
+    await api.completeTask(
+      Number(id),
+      task.status !== "Completed"
+    );
+
     await refresh();
   }
-  async function reassignTask(id: string, owner: DemoOwner) {
-    await api.updateTask(Number(id), { owner_id: caregiverIds[owner], actor_caregiver_id: DEMO_ACTOR_CAREGIVER_ID });
+
+  async function reassignTask(
+    id: string,
+    owner: DemoOwner
+  ) {
+    await api.updateTask(Number(id), {
+      owner_id: caregiverIds[owner],
+      actor_caregiver_id: DEMO_ACTOR_CAREGIVER_ID,
+    });
+
     await refresh();
   }
-  async function createHandoff(handoff: Omit<DemoHandoff, "id" | "stage" | "created">) {
-    const caregiverIds: Record<DemoOwner, number> = { "Ananya Rao": DEMO_ACTOR_CAREGIVER_ID, "Rahul Rao": 1, "Lakshmi Rao": 2, "Priya Rao": 3 };
-    const created = await api.createHandoff({ patient_id: DEMO_PATIENT_ID, title: handoff.title, from_caregiver_id: caregiverIds[handoff.from], to_caregiver_id: caregiverIds[handoff.to], reason: handoff.reason, actor_caregiver_id: DEMO_ACTOR_CAREGIVER_ID });
+
+  async function createHandoff(
+    handoff: Omit<
+      DemoHandoff,
+      "id" | "stage" | "created"
+    >
+  ) {
+    const created = await api.createHandoff({
+      patient_id: DEMO_PATIENT_ID,
+      title: handoff.title,
+      from_caregiver_id:
+        caregiverIds[handoff.from],
+      to_caregiver_id:
+        caregiverIds[handoff.to],
+      reason: handoff.reason,
+      actor_caregiver_id: DEMO_ACTOR_CAREGIVER_ID,
+    });
+
     await refresh();
+
     return String(created.id);
   }
-  async function sendHandoff(id: string) { await api.sendHandoff(Number(id)); await refresh(); }
+
+  async function sendHandoff(id: string) {
+    await api.sendHandoff(Number(id));
+    await refresh();
+  }
+
   async function acknowledgeHandoff(id: string) {
-    const handoff = handoffs.find((item) => item.id === id);
-    if (!handoff) throw new Error("Handoff not found.");
-    await api.acknowledgeHandoff(Number(id), caregiverIds[handoff.to]);
+    const handoff = handoffs.find(
+      (item) => item.id === id
+    );
+
+    if (!handoff) {
+      throw new Error("Handoff not found.");
+    }
+
+    await api.acknowledgeHandoff(
+      Number(id),
+      caregiverIds[handoff.to]
+    );
+
     await refresh();
   }
+
   async function completeHandoff(id: string) {
-    const handoff = handoffs.find((item) => item.id === id);
-    if (!handoff) throw new Error("Handoff not found.");
-    await api.completeHandoff(Number(id), caregiverIds[handoff.to]);
+    const handoff = handoffs.find(
+      (item) => item.id === id
+    );
+
+    if (!handoff) {
+      throw new Error("Handoff not found.");
+    }
+
+    await api.completeHandoff(
+      Number(id),
+      caregiverIds[handoff.to]
+    );
+
     await refresh();
   }
-  async function updateConsentPermission (
+
+  async function updateConsentPermission(
     caregiver: DemoOwner,
     permission: PermissionName,
     enabled: boolean
   ) {
     if (caregiver === "Ananya Rao") {
-      throw new Error("Patient permissions cannot be managed as caregiver permissions.");
+      throw new Error(
+        "Patient permissions cannot be managed as caregiver permissions."
+      );
     }
 
-    const caregiverIds: Record<Exclude<DemoOwner, "Ananya Rao">, number> = {
+    const permissionCaregiverIds: Record<
+      Exclude<DemoOwner, "Ananya Rao">,
+      number
+    > = {
       "Rahul Rao": 1,
       "Lakshmi Rao": 2,
       "Priya Rao": 3,
@@ -280,10 +594,12 @@ function mapTimelineEvent(event: ApiTimelineEvent): DemoTimelineEvent {
     try {
       await api.updatePermission({
         patient_id: DEMO_PATIENT_ID,
-        caregiver_id: caregiverIds[caregiver],
+        caregiver_id:
+          permissionCaregiverIds[caregiver],
         permission_name: permission,
         enabled,
-        actor_caregiver_id: DEMO_ACTOR_CAREGIVER_ID,
+        actor_caregiver_id:
+          DEMO_ACTOR_CAREGIVER_ID,
       });
 
       setPermissions((previous) => ({
@@ -306,35 +622,59 @@ function mapTimelineEvent(event: ApiTimelineEvent): DemoTimelineEvent {
     }
   }
 
-const value = useMemo(() => ({
-  tasks,
-  handoffs,
-  timeline,
-  permissions,
-  loading,
-  error,
-  addTask,
-  updateTask,
-  completeTask,
-  reassignTask,
-  createHandoff,
-  sendHandoff,
-  acknowledgeHandoff,
-  requestHandoffChanges: () => unsupportedMutation("Handoff review requests are not supported by the backend yet."),
-  completeHandoff,
-  addTimelineEvent: () => unsupportedMutation("Timeline events are recorded by backend mutations."),
-  updateConsentPermission,
-}), [tasks, handoffs, timeline, permissions, loading, error]);
-return (
-    <DemoContext.Provider value={value}>{children}</DemoContext.Provider>
+  const value = useMemo(
+    () => ({
+      tasks,
+      handoffs,
+      timeline,
+      permissions,
+      loading,
+      error,
+      addTask,
+      updateTask,
+      completeTask,
+      reassignTask,
+      createHandoff,
+      sendHandoff,
+      acknowledgeHandoff,
+      requestHandoffChanges: () =>
+        unsupportedMutation(
+          "Handoff review requests are not supported by the backend yet."
+        ),
+      completeHandoff,
+      addTimelineEvent: () =>
+        unsupportedMutation(
+          "Timeline events are recorded by backend mutations."
+        ),
+      updateConsentPermission,
+    }),
+    [
+      tasks,
+      handoffs,
+      timeline,
+      permissions,
+      loading,
+      error,
+    ]
+  );
+
+  return (
+    <DemoContext.Provider value={value}>
+      {children}
+    </DemoContext.Provider>
   );
 }
 
 export function useMaatruCareDemo() {
   const context = useContext(DemoContext);
-  if (!context) throw new Error("useMaatruCareDemo must be used inside MaatruCareDemoProvider");
+
+  if (!context) {
+    throw new Error(
+      "useMaatruCareDemo must be used inside MaatruCareDemoProvider"
+    );
+  }
+
   return context;
 }
 
 export { initialHandoff };
-
