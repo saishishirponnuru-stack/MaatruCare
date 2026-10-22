@@ -117,17 +117,20 @@ export function MaatruCareDemoProvider({ children }: { children: ReactNode }) {
     };
   }
 
-  function mapTimelineEvent(event: ApiTimelineEvent): DemoTimelineEvent {
-    return {
-      id: String(event.id),
-      title: event.title,
-      description: event.description ?? event.event_type,
-      time: new Date(event.event_date).toLocaleDateString("en-GB", { day: "numeric", month: "short" }),
-      eventDate: String(event.event_date).slice(0, 10),
-      eventType: event.event_type,
-      source: event.source ?? undefined,
-    };
+function mapTimelineEvent(event: ApiTimelineEvent): DemoTimelineEvent {
+  return {
+    id: String(event.id),
+    title: event.title,
+    description: event.description ?? event.event_type,
+    time: new Date(event.event_date).toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+    }),
+    eventDate: String(event.event_date).slice(0, 10),
+    eventType: event.event_type,
+    source: event.source ?? undefined,
   };
+}
   }
 
   function mapPermissions(records: ApiPermission[], caregivers: ApiCaregiver[]): DemoPermissions {
