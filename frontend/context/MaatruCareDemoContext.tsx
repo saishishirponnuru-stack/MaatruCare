@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { api, DEMO_ACTOR_CAREGIVER_ID, DEMO_PATIENT_ID, type ApiCaregiver, type ApiHandoff, type ApiPermission, type ApiTask, type ApiTimelineEvent } from "@/lib/api";
@@ -9,7 +9,15 @@ export type DemoTaskStatus = "Open" | "Completed";
 export type DemoTask = { id: string; title: string; owner: DemoOwner; dueDate: string; category: DemoCategory; status: DemoTaskStatus; note: string; createdBy: string };
 export type DemoHandoffStage = "Prepared" | "Sent" | "Reviewed" | "Acknowledged" | "Completed" | "Needs review";
 export type DemoHandoff = { id: string; title: string; from: DemoOwner; to: DemoOwner; reason: string; task: string; contexts: string[]; stage: DemoHandoffStage; created: string; clarification?: string };
-export type DemoTimelineEvent = { id: string; title: string; description: string; time: string };
+export type DemoTimelineEvent = {
+  id: string;
+  title: string;
+  description: string;
+  time: string;
+  eventDate: string;
+  eventType: string;
+  source?: string;
+};
 export type PermissionName = "Appointments" | "Coordination tasks" | "Care handoffs" | "Approved care updates";
 export type DemoPermissions = Record<DemoOwner, Record<PermissionName, boolean>>;
 
@@ -115,7 +123,11 @@ export function MaatruCareDemoProvider({ children }: { children: ReactNode }) {
       title: event.title,
       description: event.description ?? event.event_type,
       time: new Date(event.event_date).toLocaleDateString("en-GB", { day: "numeric", month: "short" }),
+      eventDate: String(event.event_date).slice(0, 10),
+      eventType: event.event_type,
+      source: event.source ?? undefined,
     };
+  };
   }
 
   function mapPermissions(records: ApiPermission[], caregivers: ApiCaregiver[]): DemoPermissions {
@@ -322,3 +334,4 @@ export function useMaatruCareDemo() {
 }
 
 export { initialHandoff };
+

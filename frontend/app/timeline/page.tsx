@@ -230,28 +230,29 @@ export default function TimelinePage() {
 
   const visibleEvents = useMemo(() => {
     const sharedEvents: TimelineEvent[] = timeline.map((event) => {
-      const eventDate = event.time;
       const title = event.title.toLowerCase();
-
-      const eventType: EventType =
-        /appointment|clinic visit/.test(title) ? "Appointment" :
-        /task|documents folder/.test(title) ? "Task" :
-        /sharing|care status|consent|verified/.test(title) ? "Care update" :
-        "Coordination";
-
       const phase: Phase =
-        eventDate < "2026-06-01" ? "Preconception" :
-        eventDate < "2026-10-01" ? "Pregnancy" :
-        eventDate < "2026-11-01" ? "Postnatal" :
+        event.eventDate < "2026-06-01" ? "Preconception" :
+        event.eventDate < "2026-10-01" ? "Pregnancy" :
+        event.eventDate < "2026-11-01" ? "Postnatal" :
         "Early motherhood";
+
+      const validTypes: EventType[] = ["Appointment", "Care update", "Coordination", "Task"];
+      const type = validTypes.includes(event.eventType as EventType)
+        ? event.eventType as EventType
+        : /appointment|clinic visit/.test(title) ? "Appointment"
+        : /task|documents folder/.test(title) ? "Task"
+        : /sharing|care status|consent|verified/.test(title) ? "Care update"
+        : "Coordination";
 
       return {
         id: event.id,
         phase,
-        date: eventDate,
+        date: event.eventDate,
         title: event.title,
-        type: eventType,
+        type,
         description: event.description,
+        source: event.source,
         status: "Recorded",
       };
     });
@@ -490,6 +491,7 @@ export default function TimelinePage() {
     </AppShell>
   );
 }
+
 
 
 
