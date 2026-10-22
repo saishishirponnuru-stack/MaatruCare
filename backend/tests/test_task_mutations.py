@@ -48,3 +48,48 @@ def test_task_rejects_invalid_assignment_and_unauthorized_mutation(client: TestC
 		json={"patient_id": 1, "title": "Unknown actor task", "owner_id": 2, "due_date": "2026-10-20", "category": "Transport", "actor_caregiver_id": 999},
 	)
 	assert unknown_actor.status_code == 404
+
+def test_task_creation_completion_and_reopening_record_timeline_events(client: TestClient, db_session) -> None:
+        from app.models import TimelineEvent
+
+        created = client.post(
+                "/api/tasks",
+                json={
+                        "patient_id": 1,
+                        "title": "Timeline regression test task",
+                        "owner_id": 2,
+                        "due_date": "2026-10-28",
+                        "category": "Coordination",
+                        "actor_caregiver_id": 1,
+                },
+        )
+        assert created.status_code == 201
+        task_id = created.json()["id"]
+
+        completed = client.post(
+                f"/api/tasks/{task_id}/complete",
+                json={"actor_caregiver_id": 1, "completed": True},
+        )
+        assert completed.status_code == 200
+
+        reopened = client.post(
+                f"/api/tasks/{task_id}/complete",
+                json={"actor_caregiver_id": 1, "completed": False},
+        )
+        assert reopened.status_code == 200
+
+        events = db_session.scalars(
+                select(TimelineEvent)
+                .where(
+                        TimelineEvent.source == "Coordination task",
+                        TimelineEvent.title == "Timeline regression test task",
+                )
+                .order_by(TimelineEvent.id)
+        ).all()
+
+        assert len(events) == 3
+        assert [event.description for event in events] == [
+                "A coordination task was created.",
+                "A coordination task was completed.",
+                "A coordination task was reopened.",
+        ]

@@ -8,7 +8,7 @@ from ..database import get_db
 from ..models import Task
 from ..schemas import TaskCompletion, TaskCreate, TaskResponse, TaskUpdate
 from ..services.access_service import get_active_caregiver, require_patient_caregiver, require_permission
-from ..services.audit_service import record_audit
+from ..services.audit_service import record_audit, record_timeline_event
 
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 
@@ -43,6 +43,7 @@ def create_task(payload: TaskCreate, db: Session = Depends(get_db)) -> Task:
 		db.add(task)
 		db.flush()
 		record_audit(db, patient_id=payload.patient_id, actor_name=actor.name, action="task_created", resource_type="Task", resource_id=task.id)
+		record_timeline_event(db, patient_id=task.patient_id, event_type="Task", title=task.title, description="A coordination task was created.", source="Coordination task")
 		db.commit()
 	except Exception:
 		db.rollback()
@@ -100,6 +101,7 @@ def complete_task(task_id: int, payload: TaskCompletion, db: Session = Depends(g
 	task.completed_at = datetime.utcnow() if payload.completed else None
 	try:
 		record_audit(db, patient_id=task.patient_id, actor_name=actor.name, action="task_completed" if payload.completed else "task_reopened", resource_type="Task", resource_id=task.id)
+		record_timeline_event(db, patient_id=task.patient_id, event_type="Task", title=task.title, description="A coordination task was completed." if payload.completed else "A coordination task was reopened.", source="Coordination task")
 		db.commit()
 	except Exception:
 		db.rollback()
