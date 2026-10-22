@@ -7,7 +7,6 @@ import { useState } from "react";
 import {
   ArrowRight,
   CalendarDays,
-  Check,
   CheckCircle2,
   Clock3,
   FileCheck2,
@@ -129,8 +128,6 @@ export default function JourneyPage() {
 
               <div className="grid gap-4 sm:grid-cols-4 sm:gap-3">
                 {phases.map((phase, index) => {
-                  const isCompleted = index === 0;
-                  const isCurrent = phase === "Pregnancy";
                   const isSelected = phase === selectedPhase;
 
                   return (
@@ -146,28 +143,20 @@ export default function JourneyPage() {
                     >
                       <span
                         className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-[3px] bg-white ${
-                          isCurrent
+                          isSelected
                             ? "border-[#6D3A5B] shadow-[0_0_0_5px_rgba(109,58,91,0.08)]"
-                            : isCompleted
-                              ? "border-[#6D3A5B] bg-[#6D3A5B]"
-                              : "border-[#E9E1E4]"
+                            : "border-[#E9E1E4]"
                         }`}
                       >
-                        {isCompleted ? (
-                          <Check size={15} strokeWidth={2.8} className="text-white" />
-                        ) : isCurrent ? (
-                          <span className="h-2.5 w-2.5 rounded-full bg-[#6D3A5B]" />
-                        ) : (
-                          <span className="h-1.5 w-1.5 rounded-full bg-[#D5CDD1]" />
-                        )}
+                        <span className={`h-2.5 w-2.5 rounded-full ${isSelected ? "bg-[#6D3A5B]" : "bg-[#D5CDD1]"}`} />
                       </span>
 
                       <span className="sm:mt-3">
-                        <span className={`block text-[12px] font-semibold ${isCurrent ? "text-[#6D3A5B]" : isCompleted ? "text-[#211C1F]" : "text-[#9A9196]"}`}>
+                        <span className={`block text-[12px] font-semibold ${isSelected ? "text-[#6D3A5B]" : "text-[#756D72]"}`}>
                           {phase}
                         </span>
                         <span className="mt-1 block text-[10px] text-[#9A9196]">
-                          {isCurrent ? "Current phase" : isCompleted ? "Completed" : "Upcoming"}
+                          {isSelected ? "Selected" : "Explore phase"}
                         </span>
                       </span>
                     </motion.button>
@@ -191,13 +180,13 @@ export default function JourneyPage() {
         <section className="mt-8 rounded-[22px] border border-[#E9E1E4] bg-white p-6 shadow-[0_8px_30px_rgba(33,28,31,0.035)]">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
             <div className="max-w-2xl">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9A9196]">Current phase</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9A9196]">Care coordination</p>
               <div className="mt-2 flex flex-wrap items-center gap-3">
-                <h2 className="text-2xl font-semibold tracking-[-0.03em] text-[#211C1F]">Pregnancy</h2>
-                <span className="rounded-full bg-[#F3EAF0] px-3 py-1.5 text-[10px] font-semibold text-[#6D3A5B]">Current phase</span>
+                <h2 className="text-2xl font-semibold tracking-[-0.03em] text-[#211C1F]">Support through every phase</h2>
+                <span className="rounded-full bg-[#F3EAF0] px-3 py-1.5 text-[10px] font-semibold text-[#6D3A5B]">Explore all stages</span>
               </div>
               <p className="mt-3 text-sm leading-6 text-[#756D72]">
-                Keep appointments, shared responsibilities and approved care information coordinated with the people you trust.
+                Explore each phase to see how appointments, shared responsibilities and approved care information can stay coordinated with the people you trust.
               </p>
             </div>
 
@@ -224,10 +213,9 @@ export default function JourneyPage() {
           </div>
 
           <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {phases.map((phase, index) => {
+            {phases.map((phase) => {
               const Icon = phaseIcons[phase];
               const isSelected = phase === selectedPhase;
-              const isCurrent = phase === "Pregnancy";
 
               return (
                 <motion.button
@@ -238,9 +226,9 @@ export default function JourneyPage() {
                   className={`text-left rounded-[18px] border bg-white p-5 shadow-[0_6px_24px_rgba(33,28,31,0.025)] transition ${isSelected ? "border-[#B98FA5] ring-2 ring-[#F3EAF0]" : "border-[#E9E1E4] hover:border-[#D7C2CD]"}`}
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <div className={`flex h-9 w-9 items-center justify-center rounded-[10px] ${isCurrent ? "bg-[#F3EAF0] text-[#6D3A5B]" : "bg-[#FBF8F7] text-[#756D72]"}`}><Icon size={17} /></div>
-                    <span className={`rounded-full px-2 py-1 text-[9px] font-semibold ${isCurrent ? "bg-[#F3EAF0] text-[#6D3A5B]" : index === 0 ? "bg-[#EEF5F0] text-[#4F8068]" : "bg-[#F5F1F3] text-[#9A9196]"}`}>
-                      {isCurrent ? "Current" : index === 0 ? "Completed" : "Upcoming"}
+                    <div className={`flex h-9 w-9 items-center justify-center rounded-[10px] ${isSelected ? "bg-[#F3EAF0] text-[#6D3A5B]" : "bg-[#FBF8F7] text-[#756D72]"}`}><Icon size={17} /></div>
+                    <span className={`rounded-full px-2 py-1 text-[9px] font-semibold ${isSelected ? "bg-[#F3EAF0] text-[#6D3A5B]" : "bg-[#F5F1F3] text-[#756D72]"}`}>
+                      {isSelected ? "Selected" : "Explore"}
                     </span>
                   </div>
 

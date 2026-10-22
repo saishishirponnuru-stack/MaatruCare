@@ -4,7 +4,7 @@ import AppShell from "@/components/layout/AppShell";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { FormEvent, useState } from "react";
-import { ArrowUpRight, Check, CheckCircle2, Clock3, FileCheck2, HandHeart, Plus, ShieldAlert, ShieldCheck, X } from "lucide-react";
+import { ArrowUpRight, Check, CheckCircle2, Clock3, FileCheck2, Plus, ShieldAlert, ShieldCheck, X } from "lucide-react";
 import { useMaatruCareDemo, type DemoHandoff as Handoff, type DemoHandoffStage as Stage, type DemoOwner as Person } from "@/context/MaatruCareDemoContext";
 
 type CreateForm = { from: Person; to: Person; reason: string; task: string; contexts: string[] };

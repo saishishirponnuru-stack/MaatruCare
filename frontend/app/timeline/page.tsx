@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import AppShell from "@/components/layout/AppShell";
 import { motion } from "framer-motion";
@@ -17,6 +17,7 @@ import {
 import { useMaatruCareDemo } from "@/context/MaatruCareDemoContext";
 
 const phases = [
+  "All phases",
   "Preconception",
   "Pregnancy",
   "Postnatal",
@@ -37,7 +38,7 @@ type EventType = "Appointment" | "Care update" | "Coordination" | "Task";
 
 type TimelineEvent = {
   id: string;
-  phase: Phase;
+  phase: Phase | null;
   date: string;
   title: string;
   type: EventType;
@@ -47,160 +48,6 @@ type TimelineEvent = {
   description?: string;
   status?: string;
 };
-
-const events: TimelineEvent[] = [
-  {
-    id: "pre-1",
-    phase: "Preconception",
-    date: "2026-03-12",
-    title: "Care Circle started",
-    type: "Coordination",
-    person: "Ananya Rao",
-    description:
-      "Trusted people were invited to help with appointments and shared responsibilities.",
-    status: "Approved",
-  },
-  {
-    id: "pre-2",
-    phase: "Preconception",
-    date: "2026-03-18",
-    title: "Introductory clinic visit",
-    type: "Appointment",
-    person: "Dr. Meera Sharma",
-    source: "City Women's Clinic",
-    time: "11:00 AM",
-    description: "Visit details were added to the shared coordination timeline.",
-    status: "Completed",
-  },
-  {
-    id: "pre-3",
-    phase: "Preconception",
-    date: "2026-03-20",
-    title: "Sharing preferences set",
-    type: "Care update",
-    source: "Patient-controlled access",
-    description:
-      "Ananya chose what appointment and coordination information caregivers can see.",
-    status: "Patient approved",
-  },
-  {
-    id: "preg-1",
-    phase: "Pregnancy",
-    date: "2026-09-22",
-    title: "Care status verified",
-    type: "Care update",
-    source: "City Women's Clinic",
-    description:
-      "Clinician-documented care status was reviewed and verified.",
-    status: "Human verified",
-  },
-  {
-    id: "preg-2",
-    phase: "Pregnancy",
-    date: "2026-09-28",
-    title: "Next appointment",
-    type: "Appointment",
-    person: "Dr. Meera Sharma",
-    source: "City Women's Clinic",
-    time: "10:30 AM",
-    description: "Maternal care visit coordinated with the Care Circle.",
-    status: "Confirmed",
-  },
-  {
-    id: "preg-3",
-    phase: "Pregnancy",
-    date: "2026-09-28",
-    title: "Transport confirmed",
-    type: "Coordination",
-    person: "Lakshmi Rao",
-    description: "Transport for the 28 September appointment is assigned.",
-    status: "Assigned",
-  },
-  {
-    id: "preg-4",
-    phase: "Pregnancy",
-    date: "2026-09-28",
-    title: "Appointment documents",
-    type: "Task",
-    person: "Rahul Rao",
-    description: "Keep approved documents ready for the upcoming visit.",
-    status: "Open",
-  },
-  {
-    id: "preg-5",
-    phase: "Pregnancy",
-    date: "2026-09-30",
-    title: "Caregiver availability",
-    type: "Coordination",
-    person: "Priya Rao",
-    description: "Confirm who can support around the scheduled visit.",
-    status: "Open",
-  },
-  {
-    id: "post-1",
-    phase: "Postnatal",
-    date: "2026-10-14",
-    title: "Follow-up clinic visit",
-    type: "Appointment",
-    person: "Dr. Meera Sharma",
-    source: "City Women's Clinic",
-    time: "9:30 AM",
-    description: "Scheduled visit kept in the shared coordination calendar.",
-    status: "Upcoming",
-  },
-  {
-    id: "post-2",
-    phase: "Postnatal",
-    date: "2026-10-14",
-    title: "Home support rota",
-    type: "Coordination",
-    person: "Lakshmi Rao",
-    description: "Family caregivers aligned around transport and household help.",
-    status: "Planned",
-  },
-  {
-    id: "post-3",
-    phase: "Postnatal",
-    date: "2026-10-16",
-    title: "Approved documents folder",
-    type: "Task",
-    person: "Rahul Rao",
-    description: "Keep visit notes and shared paperwork in one place.",
-    status: "Upcoming",
-  },
-  {
-    id: "early-1",
-    phase: "Early motherhood",
-    date: "2026-11-04",
-    title: "Routine clinic appointment",
-    type: "Appointment",
-    source: "City Women's Clinic",
-    time: "10:00 AM",
-    description: "Appointment time shared with approved caregivers.",
-    status: "Upcoming",
-  },
-  {
-    id: "early-2",
-    phase: "Early motherhood",
-    date: "2026-11-05",
-    title: "Care Circle check-in",
-    type: "Coordination",
-    person: "Priya Rao",
-    description: "Confirm who is available for errands and appointment support.",
-    status: "Upcoming",
-  },
-  {
-    id: "early-3",
-    phase: "Early motherhood",
-    date: "2026-11-06",
-    title: "Sharing settings reviewed",
-    type: "Care update",
-    source: "Patient-controlled access",
-    description:
-      "Access to appointments and coordination updates can be changed at any time.",
-    status: "Patient approved",
-  },
-];
 
 const typeIcons = {
   Appointment: CalendarDays,
@@ -225,17 +72,13 @@ function formatDate(date: string) {
 
 export default function TimelinePage() {
   const { timeline } = useMaatruCareDemo();
-  const [phase, setPhase] = useState<Phase>("Pregnancy");
+  const [phase, setPhase] = useState<Phase>("All phases");
   const [filter, setFilter] = useState<Filter>("All");
 
   const visibleEvents = useMemo(() => {
     const sharedEvents: TimelineEvent[] = timeline.map((event) => {
       const title = event.title.toLowerCase();
-      const phase: Phase =
-        event.eventDate < "2026-06-01" ? "Preconception" :
-        event.eventDate < "2026-10-01" ? "Pregnancy" :
-        event.eventDate < "2026-11-01" ? "Postnatal" :
-        "Early motherhood";
+      const phase: Phase | null = null;
 
       const validTypes: EventType[] = ["Appointment", "Care update", "Coordination", "Task"];
       const type = validTypes.includes(event.eventType as EventType)
@@ -258,7 +101,7 @@ export default function TimelinePage() {
     });
 
     return sharedEvents.filter((event) => {
-      if (event.phase !== phase) return false;
+      if (phase !== "All phases" && event.phase !== phase) return false;
       if (filter === "All") return true;
       return event.type === filterToType[filter];
     });
@@ -360,8 +203,7 @@ export default function TimelinePage() {
                 No events in this view
               </p>
               <p className="mt-2 text-xs leading-5 text-[#756D72]">
-                Try another phase or filter to see approved coordination
-                activity.
+                Phase-specific events require a verified care-phase assignment. Select All phases to view recorded activity.
               </p>
             </div>
           ) : (
@@ -405,9 +247,9 @@ export default function TimelinePage() {
                               <p className="mt-1 text-[10px] text-[#9A9196]">
                                 {event.person ?? event.source}
                                 {event.person && event.source
-                                  ? ` Â· ${event.source}`
+                                  ? ` · ${event.source}`
                                   : ""}
-                                {event.time ? ` Â· ${event.time}` : ""}
+                                {event.time ? ` · ${event.time}` : ""}
                               </p>
                             </div>
                           </div>

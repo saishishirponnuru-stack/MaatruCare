@@ -1,10 +1,10 @@
-﻿"use client";
+"use client";
 
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
-  useMemo,
   useState,
   type ReactNode,
 } from "react";
@@ -163,6 +163,158 @@ export type MaatruCareDemoContextValue = {
 const DemoContext =
   createContext<MaatruCareDemoContextValue | null>(null);
 
+function caregiverName(
+  id: number | null,
+  caregivers: ApiCaregiver[]
+): DemoOwner | undefined {
+  return caregivers.find(
+    (caregiver) => caregiver.id === id
+  )?.name as DemoOwner | undefined;
+}
+
+function mapTask(
+  task: ApiTask,
+  caregivers: ApiCaregiver[]
+): DemoTask {
+  return {
+    id: String(task.id),
+    title: task.title,
+    owner:
+      caregiverName(task.owner_id, caregivers) ??
+      "Ananya Rao",
+    dueDate: task.due_date,
+    category: task.category as DemoCategory,
+    status:
+      task.status === "Completed" ? "Completed" : "Open",
+    note: "Persisted coordination task.",
+    createdBy: "MaatruCare",
+  };
+}
+
+function mapHandoff(
+  handoff: ApiHandoff,
+  caregivers: ApiCaregiver[]
+): DemoHandoff {
+  const from =
+    caregiverName(
+      handoff.from_caregiver_id,
+      caregivers
+    ) ?? "Ananya Rao";
+
+  const to =
+    caregiverName(
+      handoff.to_caregiver_id,
+      caregivers
+    ) ?? "Ananya Rao";
+
+  const stage: DemoHandoffStage =
+    handoff.status === "Completed"
+      ? "Completed"
+      : handoff.status === "Prepared"
+        ? "Prepared"
+        : handoff.status === "Acknowledged"
+          ? "Acknowledged"
+          : handoff.status ===
+              "Awaiting acknowledgement"
+            ? "Sent"
+            : "Sent";
+
+  return {
+    id: String(handoff.id),
+    title: handoff.title,
+    from,
+    to,
+    reason: handoff.reason,
+    task: "Coordination responsibility",
+    contexts: [],
+    stage,
+    created: new Date(
+      handoff.created_at
+    ).toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+    }),
+  };
+}
+
+// Preserve the actual API date and event type.
+function mapTimelineEvent(
+  event: ApiTimelineEvent
+): DemoTimelineEvent {
+  return {
+    id: String(event.id),
+    title: event.title,
+    description:
+      event.description ?? event.event_type,
+    time: new Date(
+      event.event_date
+    ).toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+    }),
+    eventDate: String(event.event_date).slice(0, 10),
+    eventType: event.event_type,
+    source: event.source ?? undefined,
+  };
+}
+
+function mapPermissions(
+  records: ApiPermission[],
+  caregivers: ApiCaregiver[]
+): DemoPermissions {
+  const mapped: DemoPermissions = {
+    "Ananya Rao": {
+      Appointments: false,
+      "Coordination tasks": false,
+      "Care handoffs": false,
+      "Approved care updates": false,
+    },
+    "Rahul Rao": {
+      Appointments: false,
+      "Coordination tasks": false,
+      "Care handoffs": false,
+      "Approved care updates": false,
+    },
+    "Lakshmi Rao": {
+      Appointments: false,
+      "Coordination tasks": false,
+      "Care handoffs": false,
+      "Approved care updates": false,
+    },
+    "Priya Rao": {
+      Appointments: false,
+      "Coordination tasks": false,
+      "Care handoffs": false,
+      "Approved care updates": false,
+    },
+  };
+
+  records.forEach((record) => {
+    const name = caregiverName(
+      record.caregiver_id,
+      caregivers
+    );
+
+    const permissionNames: readonly string[] = [
+      "Appointments",
+      "Coordination tasks",
+      "Care handoffs",
+      "Approved care updates",
+    ];
+
+    if (
+      name &&
+      owners.includes(name) &&
+      permissionNames.includes(record.permission_name)
+    ) {
+      mapped[name][record.permission_name as PermissionName] =
+        record.enabled;
+    }
+  });
+
+  return mapped;
+}
+
 export function MaatruCareDemoProvider({
   children,
 }: {
@@ -203,157 +355,14 @@ export function MaatruCareDemoProvider({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  function caregiverName(
-    id: number | null,
-    caregivers: ApiCaregiver[]
-  ): DemoOwner | undefined {
-    return caregivers.find(
-      (caregiver) => caregiver.id === id
-    )?.name as DemoOwner | undefined;
-  }
-
-  function mapTask(
-    task: ApiTask,
-    caregivers: ApiCaregiver[]
-  ): DemoTask {
-    return {
-      id: String(task.id),
-      title: task.title,
-      owner:
-        caregiverName(task.owner_id, caregivers) ??
-        "Ananya Rao",
-      dueDate: task.due_date,
-      category: task.category as DemoCategory,
-      status:
-        task.status === "Completed" ? "Completed" : "Open",
-      note: "Persisted coordination task.",
-      createdBy: "MaatruCare",
-    };
-  }
-
-  function mapHandoff(
-    handoff: ApiHandoff,
-    caregivers: ApiCaregiver[]
-  ): DemoHandoff {
-    const from =
-      caregiverName(
-        handoff.from_caregiver_id,
-        caregivers
-      ) ?? "Ananya Rao";
-
-    const to =
-      caregiverName(
-        handoff.to_caregiver_id,
-        caregivers
-      ) ?? "Ananya Rao";
-
-    const stage: DemoHandoffStage =
-      handoff.status === "Completed"
-        ? "Completed"
-        : handoff.status === "Prepared"
-          ? "Prepared"
-          : handoff.status === "Acknowledged"
-            ? "Acknowledged"
-            : handoff.status ===
-                "Awaiting acknowledgement"
-              ? "Sent"
-              : "Sent";
-
-    return {
-      id: String(handoff.id),
-      title: handoff.title,
-      from,
-      to,
-      reason: handoff.reason,
-      task: "Coordination responsibility",
-      contexts: [],
-      stage,
-      created: new Date(
-        handoff.created_at
-      ).toLocaleDateString("en-GB", {
-        day: "numeric",
-        month: "short",
-      }),
-    };
-  }
-
-  // Preserve the actual API date and event type.
-  function mapTimelineEvent(
-    event: ApiTimelineEvent
-  ): DemoTimelineEvent {
-    return {
-      id: String(event.id),
-      title: event.title,
-      description:
-        event.description ?? event.event_type,
-      time: new Date(
-        event.event_date
-      ).toLocaleDateString("en-GB", {
-        day: "numeric",
-        month: "short",
-      }),
-      eventDate: String(event.event_date).slice(0, 10),
-      eventType: event.event_type,
-      source: event.source ?? undefined,
-    };
-  }
-
-  function mapPermissions(
-    records: ApiPermission[],
-    caregivers: ApiCaregiver[]
-  ): DemoPermissions {
-    const mapped: DemoPermissions = {
-      "Ananya Rao": {
-        Appointments: false,
-        "Coordination tasks": false,
-        "Care handoffs": false,
-        "Approved care updates": false,
-      },
-      "Rahul Rao": {
-        Appointments: false,
-        "Coordination tasks": false,
-        "Care handoffs": false,
-        "Approved care updates": false,
-      },
-      "Lakshmi Rao": {
-        Appointments: false,
-        "Coordination tasks": false,
-        "Care handoffs": false,
-        "Approved care updates": false,
-      },
-      "Priya Rao": {
-        Appointments: false,
-        "Coordination tasks": false,
-        "Care handoffs": false,
-        "Approved care updates": false,
-      },
-    };
-
-    records.forEach((record) => {
-      const name = caregiverName(
-        record.caregiver_id,
-        caregivers
-      );
-
-      if (name && owners.includes(name)) {
-        mapped[name][
-          record.permission_name as PermissionName
-        ] = record.enabled;
-      }
-    });
-
-    return mapped;
-  }
-
-  async function refresh() {
+  const refresh = useCallback(async function refresh(): Promise<boolean> {
     setLoading(true);
 
     const errors: string[] = [];
 
     try {
-      const caregivers = await api.getCaregivers();
-
       const results = await Promise.allSettled([
+        api.getCaregivers(),
         api.getTasks(),
         api.getHandoffs(),
         api.getTimeline(),
@@ -361,11 +370,18 @@ export function MaatruCareDemoProvider({
       ]);
 
       const [
+        caregiversResult,
         tasksResult,
         handoffsResult,
         timelineResult,
         permissionsResult,
       ] = results;
+
+      if (caregiversResult.status === "rejected") {
+        throw new Error("Caregiver data could not be loaded.");
+      }
+
+      const caregivers = caregiversResult.value;
 
       if (tasksResult.status === "fulfilled") {
         setTasks(
@@ -413,16 +429,18 @@ export function MaatruCareDemoProvider({
       }
 
       setError(errors.join(" "));
+      return errors.length === 0;
     } catch (cause) {
       setError(
         cause instanceof Error
           ? cause.message
           : "Unable to load coordination data."
       );
+      return false;
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
     const handle = window.setTimeout(
@@ -433,7 +451,7 @@ export function MaatruCareDemoProvider({
     );
 
     return () => window.clearTimeout(handle);
-  }, []);
+  }, [refresh]);
 
   async function unsupportedMutation(
     message: string
@@ -622,8 +640,7 @@ export function MaatruCareDemoProvider({
     }
   }
 
-  const value = useMemo(
-    () => ({
+  const value: MaatruCareDemoContextValue = {
       tasks,
       handoffs,
       timeline,
@@ -647,17 +664,7 @@ export function MaatruCareDemoProvider({
           "Timeline events are recorded by backend mutations."
         ),
       updateConsentPermission,
-    }),
-    [
-      tasks,
-      handoffs,
-      timeline,
-      permissions,
-      loading,
-      error,
-    ]
-  );
-
+  };
   return (
     <DemoContext.Provider value={value}>
       {children}
