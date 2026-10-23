@@ -1,3 +1,4 @@
+from .routers import ai
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -66,3 +67,5 @@ app.include_router(appointments.router)
 app.include_router(handoffs.router)
 app.include_router(permissions.router)
 app.include_router(timeline.router)
+
+app.include_router(ai.router)

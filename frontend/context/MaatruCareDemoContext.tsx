@@ -290,10 +290,13 @@ function mapPermissions(
   };
 
   records.forEach((record) => {
-    const name = caregiverName(
-      record.caregiver_id,
-      caregivers
-    );
+    const permissionCaregiverNames: Record<number, DemoOwner> = {
+      1: "Rahul Rao",
+      2: "Lakshmi Rao",
+      3: "Priya Rao",
+    };
+
+    const name = permissionCaregiverNames[record.caregiver_id];
 
     const permissionNames: readonly string[] = [
       "Appointments",
@@ -384,11 +387,25 @@ export function MaatruCareDemoProvider({
       const caregivers = caregiversResult.value;
 
       if (tasksResult.status === "fulfilled") {
-        setTasks(
-          tasksResult.value.map((task) =>
-            mapTask(task, caregivers)
-          )
-        );
+        const uniqueTasks = new Map<string, DemoTask>();
+
+        for (const task of tasksResult.value) {
+          if (task.id === null || task.id === undefined || String(task.id).trim() === "") {
+            console.warn("Skipping task with missing ID:", task);
+            continue;
+          }
+
+          const mapped = mapTask(task, caregivers);
+
+          if (uniqueTasks.has(mapped.id)) {
+            console.warn("Duplicate task ID received:", mapped.id);
+            continue;
+          }
+
+          uniqueTasks.set(mapped.id, mapped);
+        }
+
+        setTasks(Array.from(uniqueTasks.values()));
       } else {
         errors.push("Tasks could not be loaded.");
       }
@@ -470,7 +487,7 @@ export function MaatruCareDemoProvider({
   async function addTask(
     task: Omit<DemoTask, "id" | "status" | "createdBy">
   ) {
-    await api.createTask({
+    const created = await api.createTask({
       patient_id: DEMO_PATIENT_ID,
       title: task.title,
       owner_id: caregiverIds[task.owner],
@@ -479,26 +496,71 @@ export function MaatruCareDemoProvider({
       actor_caregiver_id: DEMO_ACTOR_CAREGIVER_ID,
     });
 
-    await refresh();
-  }
+    const newTask: DemoTask = {
+      ...task,
+      id: String(created.id),
+      status: created.status === "Completed" ? "Completed" : "Open",
+      createdBy: "MaatruCare",
+    };
 
+    setTasks((previous) => [
+      newTask,
+      ...previous.filter((item) => item.id !== newTask.id),
+    ]);
+
+    void api.getTimeline()
+      .then((events) => {
+        setTimeline(events.map(mapTimelineEvent));
+      })
+      .catch((error) => {
+        console.warn("Timeline refresh failed:", error);
+      });
+  }
   async function updateTask(
     id: string,
     patch: Partial<DemoTask>
   ) {
-    await api.updateTask(Number(id), {
-      title: patch.title,
-      owner_id: patch.owner
-        ? caregiverIds[patch.owner]
-        : undefined,
-      due_date: patch.dueDate,
-      category: patch.category,
-      actor_caregiver_id: DEMO_ACTOR_CAREGIVER_ID,
-    });
+    const task = tasks.find((item) => item.id === id);
 
-    await refresh();
+    if (!task) {
+      throw new Error("Task not found.");
+    }
+
+    const previousTask = { ...task };
+
+    setTasks((previous) =>
+      previous.map((item) =>
+        item.id === id ? { ...item, ...patch } : item
+      )
+    );
+
+    try {
+      await api.updateTask(Number(id), {
+        title: patch.title,
+        owner_id:
+          patch.owner && patch.owner !== task.owner
+            ? caregiverIds[patch.owner]
+            : undefined,
+        due_date: patch.dueDate,
+        category: patch.category,
+        actor_caregiver_id: DEMO_ACTOR_CAREGIVER_ID,
+      });
+
+      void api.getTimeline()
+        .then((events) => setTimeline(events.map(mapTimelineEvent)))
+        .catch((error) => {
+          console.warn("Timeline refresh failed:", error);
+        });
+    } catch (error) {
+      setTasks((previous) =>
+        previous.map((item) =>
+          item.id === id ? previousTask : item
+        )
+      );
+
+      throw error;
+    }
   }
-
   async function completeTask(id: string) {
     const task = tasks.find((item) => item.id === id);
 
@@ -506,87 +568,243 @@ export function MaatruCareDemoProvider({
       throw new Error("Task not found.");
     }
 
-    await api.completeTask(
-      Number(id),
-      task.status !== "Completed"
+    const completed = task.status !== "Completed";
+    const previousStatus = task.status;
+
+    setTasks((previous) =>
+      previous.map((item) =>
+        item.id === id
+          ? { ...item, status: completed ? "Completed" : "Open" }
+          : item
+      )
     );
 
-    await refresh();
+    try {
+      await api.completeTask(Number(id), completed);
+
+      void api.getTimeline()
+        .then((events) => setTimeline(events.map(mapTimelineEvent)))
+        .catch((error) => {
+          console.warn("Timeline refresh failed:", error);
+        });
+    } catch (error) {
+      setTasks((previous) =>
+        previous.map((item) =>
+          item.id === id
+            ? { ...item, status: previousStatus }
+            : item
+        )
+      );
+
+      throw error;
+    }
   }
 
   async function reassignTask(
     id: string,
     owner: DemoOwner
   ) {
-    await api.updateTask(Number(id), {
-      owner_id: caregiverIds[owner],
-      actor_caregiver_id: DEMO_ACTOR_CAREGIVER_ID,
-    });
+    const task = tasks.find((item) => item.id === id);
 
-    await refresh();
+    if (!task) {
+      throw new Error("Task not found.");
+    }
+
+    const previousOwner = task.owner;
+
+    setTasks((previous) =>
+      previous.map((item) =>
+        item.id === id ? { ...item, owner } : item
+      )
+    );
+
+    try {
+      await api.updateTask(Number(id), {
+        owner_id: caregiverIds[owner],
+        actor_caregiver_id: DEMO_ACTOR_CAREGIVER_ID,
+      });
+
+      void api.getTimeline()
+        .then((events) => setTimeline(events.map(mapTimelineEvent)))
+        .catch((error) => {
+          console.warn("Timeline refresh failed:", error);
+        });
+    } catch (error) {
+      setTasks((previous) =>
+        previous.map((item) =>
+          item.id === id
+            ? { ...item, owner: previousOwner }
+            : item
+        )
+      );
+
+      throw error;
+    }
   }
-
   async function createHandoff(
-    handoff: Omit<
-      DemoHandoff,
-      "id" | "stage" | "created"
-    >
+    handoff: Omit<DemoHandoff, "id" | "stage" | "created">
   ) {
     const created = await api.createHandoff({
       patient_id: DEMO_PATIENT_ID,
       title: handoff.title,
-      from_caregiver_id:
-        caregiverIds[handoff.from],
-      to_caregiver_id:
-        caregiverIds[handoff.to],
+      from_caregiver_id: caregiverIds[handoff.from],
+      to_caregiver_id: caregiverIds[handoff.to],
       reason: handoff.reason,
       actor_caregiver_id: DEMO_ACTOR_CAREGIVER_ID,
     });
 
-    await refresh();
+    const newHandoff: DemoHandoff = {
+      ...handoff,
+      id: String(created.id),
+      stage:
+        created.status === "Completed"
+          ? "Completed"
+          : created.status === "Acknowledged"
+            ? "Acknowledged"
+            : created.status === "Prepared"
+              ? "Prepared"
+              : "Sent",
+      created: new Date(created.created_at).toLocaleDateString(
+        "en-GB",
+        {
+          day: "numeric",
+          month: "short",
+        }
+      ),
+    };
+
+    setHandoffs((previous) => [
+      newHandoff,
+      ...previous.filter((item) => item.id !== newHandoff.id),
+    ]);
+
+    void api.getTimeline()
+      .then((events) => setTimeline(events.map(mapTimelineEvent)))
+      .catch((error) => {
+        console.warn("Timeline refresh failed:", error);
+      });
 
     return String(created.id);
   }
-
   async function sendHandoff(id: string) {
-    await api.sendHandoff(Number(id));
-    await refresh();
+    const handoff = handoffs.find((item) => item.id === id);
+
+    if (!handoff) {
+      throw new Error("Handoff not found.");
+    }
+
+    const previousStage = handoff.stage;
+
+    setHandoffs((previous) =>
+      previous.map((item) =>
+        item.id === id
+          ? { ...item, stage: "Sent" }
+          : item
+      )
+    );
+
+    try {
+      await api.sendHandoff(Number(id));
+
+      void api.getTimeline()
+        .then((events) => setTimeline(events.map(mapTimelineEvent)))
+        .catch((error) => {
+          console.warn("Timeline refresh failed:", error);
+        });
+    } catch (error) {
+      setHandoffs((previous) =>
+        previous.map((item) =>
+          item.id === id
+            ? { ...item, stage: previousStage }
+            : item
+        )
+      );
+
+      throw error;
+    }
   }
 
   async function acknowledgeHandoff(id: string) {
-    const handoff = handoffs.find(
-      (item) => item.id === id
-    );
+    const handoff = handoffs.find((item) => item.id === id);
 
     if (!handoff) {
       throw new Error("Handoff not found.");
     }
 
-    await api.acknowledgeHandoff(
-      Number(id),
-      caregiverIds[handoff.to]
+    const previousStage = handoff.stage;
+
+    setHandoffs((previous) =>
+      previous.map((item) =>
+        item.id === id
+          ? { ...item, stage: "Acknowledged" }
+          : item
+      )
     );
 
-    await refresh();
+    try {
+      await api.acknowledgeHandoff(
+        Number(id),
+        caregiverIds[handoff.to]
+      );
+
+      void api.getTimeline()
+        .then((events) => setTimeline(events.map(mapTimelineEvent)))
+        .catch((error) => {
+          console.warn("Timeline refresh failed:", error);
+        });
+    } catch (error) {
+      setHandoffs((previous) =>
+        previous.map((item) =>
+          item.id === id
+            ? { ...item, stage: previousStage }
+            : item
+        )
+      );
+
+      throw error;
+    }
   }
 
   async function completeHandoff(id: string) {
-    const handoff = handoffs.find(
-      (item) => item.id === id
-    );
+    const handoff = handoffs.find((item) => item.id === id);
 
     if (!handoff) {
       throw new Error("Handoff not found.");
     }
 
-    await api.completeHandoff(
-      Number(id),
-      caregiverIds[handoff.to]
+    const previousStage = handoff.stage;
+
+    setHandoffs((previous) =>
+      previous.map((item) =>
+        item.id === id
+          ? { ...item, stage: "Completed" }
+          : item
+      )
     );
 
-    await refresh();
-  }
+    try {
+      await api.completeHandoff(
+        Number(id),
+        caregiverIds[handoff.to]
+      );
 
+      void api.getTimeline()
+        .then((events) => setTimeline(events.map(mapTimelineEvent)))
+        .catch((error) => {
+          console.warn("Timeline refresh failed:", error);
+        });
+    } catch (error) {
+      setHandoffs((previous) =>
+        previous.map((item) =>
+          item.id === id
+            ? { ...item, stage: previousStage }
+            : item
+        )
+      );
+
+      throw error;
+    }
+  }
   async function updateConsentPermission(
     caregiver: DemoOwner,
     permission: PermissionName,
@@ -607,7 +825,18 @@ export function MaatruCareDemoProvider({
       "Priya Rao": 3,
     };
 
+    const previousEnabled =
+      permissions[caregiver][permission];
+
     setError("");
+
+    setPermissions((previous) => ({
+      ...previous,
+      [caregiver]: {
+        ...previous[caregiver],
+        [permission]: enabled,
+      },
+    }));
 
     try {
       await api.updatePermission({
@@ -620,16 +849,20 @@ export function MaatruCareDemoProvider({
           DEMO_ACTOR_CAREGIVER_ID,
       });
 
+      void api.getTimeline()
+        .then((events) => setTimeline(events.map(mapTimelineEvent)))
+        .catch((error) => {
+          console.warn("Timeline refresh failed:", error);
+        });
+    } catch (error) {
       setPermissions((previous) => ({
         ...previous,
         [caregiver]: {
           ...previous[caregiver],
-          [permission]: enabled,
+          [permission]: previousEnabled,
         },
       }));
 
-      await refresh();
-    } catch (error) {
       const message =
         error instanceof Error
           ? error.message
@@ -639,7 +872,6 @@ export function MaatruCareDemoProvider({
       throw error;
     }
   }
-
   const value: MaatruCareDemoContextValue = {
       tasks,
       handoffs,

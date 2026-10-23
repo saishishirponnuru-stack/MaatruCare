@@ -1,21 +1,43 @@
 @import "tailwindcss";
 
 :root {
+  color-scheme: light;
+
   --mc-brand: #6d3a5b;
   --mc-brand-dark: #4d2941;
   --mc-rose: #b86b87;
 
   --mc-background: #fbf8f7;
   --mc-surface: #ffffff;
+  --mc-surface-muted: #f5f0f2;
 
   --mc-text: #211c1f;
   --mc-muted: #756d72;
-
   --mc-border: #e9e1e4;
 
   --mc-success: #4f8068;
   --mc-warning: #b27a3a;
   --mc-danger: #b85c62;
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+
+  --mc-background: #171419;
+  --mc-surface: #221d24;
+  --mc-surface-muted: #2b242d;
+
+  --mc-text: #f5eff3;
+  --mc-muted: #c0b5bf;
+  --mc-border: #493d49;
+
+  --mc-brand: #d5a5c1;
+  --mc-brand-dark: #f0c9df;
+  --mc-rose: #e0a0bc;
+
+  --mc-success: #8bc9a5;
+  --mc-warning: #efc17e;
+  --mc-danger: #ff9da5;
 }
 
 * {
@@ -44,6 +66,58 @@ button {
   cursor: pointer;
 }
 
+::selection {
+  background: rgba(109, 58, 91, 0.2);
+}
+
+html[data-larger-text="true"] {
+  font-size: 18px;
+}
+
+html[data-larger-text="true"] body {
+  font-size: 1.05rem;
+}
+
+html[data-high-contrast="true"] {
+  --mc-text: #100d10;
+  --mc-muted: #443a43;
+  --mc-border: #756775;
+}
+
+html[data-theme="dark"][data-high-contrast="true"] {
+  --mc-text: #ffffff;
+  --mc-muted: #eee5ef;
+  --mc-border: #b8a8bb;
+}
+
+html[data-high-contrast="true"] :focus-visible {
+  outline: 3px solid var(--mc-brand);
+  outline-offset: 3px;
+}
+
+html[data-high-contrast="true"] button,
+html[data-high-contrast="true"] input,
+html[data-high-contrast="true"] textarea,
+html[data-high-contrast="true"] select {
+  border-color: var(--mc-border);
+}
+
+html[data-reduced-motion="true"],
+html[data-reduced-motion="true"] *,
+html[data-reduced-motion="true"] *::before,
+html[data-reduced-motion="true"] *::after {
+  scroll-behavior: auto !important;
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:not([data-reduced-motion="false"]) {
+    scroll-behavior: auto;
+  }
+}
+
 aside form {
   min-height: 0;
 }
@@ -57,6 +131,164 @@ aside > div[class*="flex-1"] > div[class*="flex-1"] {
   min-height: 0;
 }
 
-::selection {
-  background: rgba(109, 58, 91, 0.16);
+/* MAATRUCARE DARK THEME COMPATIBILITY */
+
+/* Shared light surfaces */
+html[data-theme="dark"] [class~="bg-white"],
+html[data-theme="dark"] [class~="bg-[#FFFFFF]"],
+html[data-theme="dark"] [class~="bg-[#ffffff]"] {
+  background-color: var(--mc-surface);
+}
+
+/* Main application backgrounds */
+html[data-theme="dark"] [class~="bg-[#FBF8F7]"],
+html[data-theme="dark"] [class~="bg-[#fbf8f7]"] {
+  background-color: var(--mc-background);
+}
+
+/* Muted backgrounds */
+html[data-theme="dark"] [class~="bg-[#F5F0F2]"],
+html[data-theme="dark"] [class~="bg-[#F3EAF0]"] {
+  background-color: var(--mc-surface-muted);
+}
+
+/* Primary typography */
+html[data-theme="dark"] [class~="text-[#211C1F]"],
+html[data-theme="dark"] [class~="text-[#211c1f]"] {
+  color: var(--mc-text);
+}
+
+/* Secondary typography */
+html[data-theme="dark"] [class~="text-[#756D72]"],
+html[data-theme="dark"] [class~="text-[#9A9196]"] {
+  color: var(--mc-muted);
+}
+
+/* Brand typography */
+html[data-theme="dark"] [class~="text-[#6D3A5B]"] {
+  color: var(--mc-brand);
+}
+
+/* Standard borders */
+html[data-theme="dark"] [class~="border-[#E9E1E4]"] {
+  border-color: var(--mc-border);
+}
+
+/* Light-mode hover backgrounds */
+html[data-theme="dark"] [class~="hover:bg-[#FBF8F7]"]:hover {
+  background-color: var(--mc-surface-muted);
+}
+
+/* Light-mode hover text */
+html[data-theme="dark"] [class~="hover:text-[#211C1F]"]:hover {
+  color: var(--mc-text);
+}
+
+/* MAATRUCARE DARK THEME REFINEMENTS V2 */
+
+html[data-theme="dark"] {
+  --mc-info-surface: #2c2430;
+  --mc-success-surface: #203329;
+  --mc-danger-surface: #392428;
+  --mc-warning-surface: #382c24;
+  --mc-hover-surface: #342b36;
+}
+
+/* Soft information and neutral panels */
+html[data-theme="dark"] :is(
+  [class~="bg-[#F8F2F6]"],
+  [class~="bg-[#F7F3F5]"],
+  [class~="bg-[#F5F1F3]"],
+  [class~="bg-[#F4EDF1]"],
+  [class~="bg-[#F0E5EB]"],
+  [class~="bg-[#EBDCE5]"],
+  [class~="bg-[#F3EFF1]"],
+  [class~="bg-[#FFFCFB]"],
+  [class~="bg-[#FFF9F8]"]
+) {
+  background-color: var(--mc-info-surface);
+}
+
+/* Success information panels */
+html[data-theme="dark"] :is(
+  [class~="bg-[#F1F8F3]"],
+  [class~="bg-[#EEF5F0]"],
+  [class~="bg-[#E7EEE9]"],
+  [class~="bg-[#F6FAF7]"],
+  [class~="bg-[#E8F0EB]"],
+  [class~="bg-[#E0EFE4]"]
+) {
+  background-color: var(--mc-success-surface);
+}
+
+/* Warning and danger panels */
+html[data-theme="dark"] :is(
+  [class~="bg-[#FFF5F5]"],
+  [class~="bg-[#FFF5F4]"],
+  [class~="bg-[#FBEDEE]"],
+  [class~="bg-[#F8E8E6]"]
+) {
+  background-color: var(--mc-danger-surface);
+}
+
+html[data-theme="dark"] :is(
+  [class~="bg-[#FFF7EE]"],
+  [class~="bg-[#F5EEE5]"],
+  [class~="bg-[#EEE8E2]"]
+) {
+  background-color: var(--mc-warning-surface);
+}
+
+/* Additional text colors */
+html[data-theme="dark"] :is(
+  [class~="text-[#A59CA1]"],
+  [class~="text-[#B1A6AB]"]
+) {
+  color: var(--mc-muted);
+}
+
+/* Keep success, warning and danger text readable */
+html[data-theme="dark"] :is(
+  [class~="text-[#4F8068]"],
+  [class~="text-[#3F6D56]"],
+  [class~="text-[#5D7064]"]
+) {
+  color: var(--mc-success);
+}
+
+html[data-theme="dark"] :is(
+  [class~="text-[#87694A]"],
+  [class~="text-[#8B623F]"]
+) {
+  color: var(--mc-warning);
+}
+
+html[data-theme="dark"] :is(
+  [class~="text-[#B85C62]"],
+  [class~="text-[#9D4B55]"],
+  [class~="text-[#8D4B50]"]
+) {
+  color: var(--mc-danger);
+}
+
+/* Soften additional light borders */
+html[data-theme="dark"] :is(
+  [class~="border-[#F0E9EC]"],
+  [class~="border-[#E4D7DF]"],
+  [class~="border-[#D8C5D0]"],
+  [class~="border-[#D7C2CD]"],
+  [class~="border-[#EFE8EB]"],
+  [class~="border-[#E2D9DD]"],
+  [class~="border-[#DCCBD5]"],
+  [class~="border-[#DCD3D7]"]
+) {
+  border-color: var(--mc-border);
+}
+
+/* Light badge backgrounds need dark-theme contrast */
+html[data-theme="dark"] :is(
+  [class~="bg-[#E8D7E0]"],
+  [class~="bg-[#E9E1E4]"]
+) {
+  background-color: var(--mc-hover-surface);
 }

@@ -67,6 +67,10 @@ def update_task(task_id: int, payload: TaskUpdate, db: Session = Depends(get_db)
 		require_permission(db, owner, "Coordination tasks")
 	if "owner_patient_id" in values and values["owner_patient_id"] is not None and values["owner_patient_id"] != task.patient_id:
 		raise HTTPException(status_code=400, detail="Patient-owned tasks must belong to the task patient")
+	if values.get("owner_id") is not None:
+	    values["owner_patient_id"] = None
+	elif values.get("owner_patient_id") is not None:
+	    values["owner_id"] = None
 	new_owner_id = values.get("owner_id", task.owner_id)
 	new_owner_patient_id = values.get("owner_patient_id", task.owner_patient_id)
 	if new_owner_id is None and new_owner_patient_id is None:

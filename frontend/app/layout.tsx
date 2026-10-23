@@ -1,6 +1,7 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import "./globals.css";
 import { MaatruCareDemoProvider } from "@/context/MaatruCareDemoContext";
+import { PreferencesProvider } from "@/context/PreferencesContext";
 
 export const metadata: Metadata = {
   title: "MaatruCare — The Coordination Layer for Motherhood",
@@ -15,7 +16,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" data-scroll-behavior="smooth">
-      <body><MaatruCareDemoProvider>{children}</MaatruCareDemoProvider></body>
+      <body>
+        <PreferencesProvider>
+          <MaatruCareDemoProvider>{children}</MaatruCareDemoProvider>
+        </PreferencesProvider>
+      </body>
     </html>
   );
 }

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { useState } from "react";
+import { usePreferences } from "@/context/PreferencesContext";
 import {
   Accessibility,
   Bell,
@@ -68,9 +69,16 @@ export default function SettingsPage() {
   const [communicationPreference, setCommunicationPreference] = useState("Email and text message");
   const [caregiverUpdates, setCaregiverUpdates] = useState("Only approved updates");
   const [appointmentReminders, setAppointmentReminders] = useState("One day before");
-  const [largerText, setLargerText] = useState(false);
-  const [highContrast, setHighContrast] = useState(false);
-  const [reducedMotion, setReducedMotion] = useState(false);
+  const {
+    theme,
+    toggleTheme,
+    largerText,
+    setLargerText,
+    highContrast,
+    setHighContrast,
+    reducedMotion,
+    setReducedMotion,
+  } = usePreferences();
   const [feedback, setFeedback] = useState("");
 
   function showFeedback(message: string) {
@@ -82,11 +90,7 @@ export default function SettingsPage() {
     setNotifications((current) => ({ ...current, [key]: !current[key] }));
   }
 
-  const pageClassName = [
-    "transition-colors",
-    largerText ? "text-[15px]" : "",
-    highContrast ? "[&_p]:text-[#4E454A] [&_label]:text-[#4E454A]" : "",
-  ].join(" ");
+  const pageClassName = "transition-colors";
 
   return (
     <AppShell>
@@ -182,9 +186,10 @@ export default function SettingsPage() {
 
             <SettingsSection reducedMotion={reducedMotion} eyebrow="Accessibility" title="Make your space easier to use" icon={<Accessibility size={17} />}>
               <div className="divide-y divide-[#EFE8EB]">
-                <ToggleRow title="Larger text" description="Increase the reading size across this page." enabled={largerText} onToggle={() => setLargerText((value) => !value)} />
-                <ToggleRow title="High contrast" description="Use stronger text contrast for easier scanning." enabled={highContrast} onToggle={() => setHighContrast((value) => !value)} />
-                <ToggleRow title="Reduced motion" description="Use fewer movement effects while navigating." enabled={reducedMotion} onToggle={() => setReducedMotion((value) => !value)} />
+                <ToggleRow title="Dark mode" description="Use a darker appearance across the application." enabled={theme === "dark"} onToggle={toggleTheme} />
+                <ToggleRow title="Larger text" description="Increase the reading size across the application." enabled={largerText} onToggle={() => setLargerText(!largerText)} />
+                <ToggleRow title="High contrast" description="Use stronger text contrast for easier scanning." enabled={highContrast} onToggle={() => setHighContrast(!highContrast)} />
+                <ToggleRow title="Reduced motion" description="Use fewer movement effects while navigating." enabled={reducedMotion} onToggle={() => setReducedMotion(!reducedMotion)} />
               </div>
             </SettingsSection>
 

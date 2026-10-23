@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -25,11 +25,12 @@ import {
   X,
 } from "lucide-react";
 import AppShell from "@/components/layout/AppShell";
+import { api } from "@/lib/api";
 
 type DraftState = "idle" | "processing" | "ready" | "approved" | "rejected";
 
-const demoDraft =
-  "Upcoming appointment coordination requires transport confirmation and appointment document preparation.";
+const demoNote =
+  "Rahul will arrange transport for the upcoming clinic appointment. Lakshmi will prepare the appointment documents.";
 
 const capabilities = [
   {
@@ -70,18 +71,54 @@ const safetyBoundaries = [
 
 export default function AIAssistPage() {
   const [draftState, setDraftState] = useState<DraftState>("idle");
-  const [draft, setDraft] = useState(demoDraft);
-  const [editedDraft, setEditedDraft] = useState(demoDraft);
+  const [draft, setDraft] = useState("");
+  const [editedDraft, setEditedDraft] = useState("");
+  const [suggestedTasks, setSuggestedTasks] = useState<string[]>([]);
+  const [coordinationNote, setCoordinationNote] = useState(demoNote);
+  const [aiError, setAiError] = useState("");
   const [isEditing, setIsEditing] = useState(false);
 
-  function prepareSummary() {
+  async function prepareSummary() {
+    const note = coordinationNote.trim();
+
+    if (note.length < 10) {
+      setAiError("Enter at least 10 characters of coordination information.");
+      return;
+    }
+
+    setAiError("");
+    setDraft("");
+    setEditedDraft("");
+    setSuggestedTasks([]);
     setDraftState("processing");
     setIsEditing(false);
-    window.setTimeout(() => {
-      setDraft(demoDraft);
-      setEditedDraft(demoDraft);
+
+    try {
+      const result = await Promise.race([
+        api.generateCoordinationSummary(note),
+        new Promise<never>((_, reject) => {
+          window.setTimeout(() => {
+            reject(new Error("Gemini is taking longer than expected. Please try again."));
+          }, 45000);
+        }),
+      ]);
+
+      if (!result.summary.trim()) {
+        throw new Error("The AI returned an empty summary.");
+      }
+
+      setDraft(result.summary);
+      setEditedDraft(result.summary);
+      setSuggestedTasks(result.tasks);
       setDraftState("ready");
-    }, 900);
+    } catch (error) {
+      setAiError(
+        error instanceof Error
+          ? error.message
+          : "AI assistance is temporarily unavailable."
+      );
+      setDraftState("idle");
+    }
   }
 
   function approveDraft() {
@@ -95,7 +132,7 @@ export default function AIAssistPage() {
   }
 
   function saveEdit() {
-    setDraft(editedDraft.trim() || demoDraft);
+    setDraft(editedDraft.trim() || draft);
     setDraftState("ready");
     setIsEditing(false);
   }
@@ -173,7 +210,14 @@ export default function AIAssistPage() {
               <DemoField label="Documented care status" value="Enhanced Observation" />
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9A9196]">Coordination information</p>
-                <p className="mt-2 rounded-[14px] bg-[#FBF8F7] p-4 text-xs leading-5 text-[#211C1F]">Upcoming clinic appointment requires transport coordination.</p>
+                <textarea
+                  value={coordinationNote}
+                  onChange={(event) => setCoordinationNote(event.target.value)}
+                  rows={4}
+                  maxLength={3000}
+                  aria-label="Synthetic coordination information"
+                  className="mt-2 w-full resize-y rounded-[14px] border border-[#E9E1E4] bg-[#FBF8F7] p-4 text-xs leading-5 text-[#211C1F] outline-none focus:border-[#6D3A5B]"
+                />
               </div>
             </div>
 
@@ -182,6 +226,12 @@ export default function AIAssistPage() {
               <p className="text-[10px] leading-4 text-[#756D72]">Synthetic information for demonstration only. No medical details are processed here.</p>
             </div>
 
+            {aiError && (
+              <p role="alert" className="mt-4 rounded-[12px] border border-[#E7D2D2] bg-[#FFF5F4] p-3 text-[11px] text-[#B85C62]">
+                {aiError}
+              </p>
+            )}
+
             <button
               type="button"
               onClick={prepareSummary}
@@ -189,7 +239,7 @@ export default function AIAssistPage() {
               className="mt-6 flex w-full items-center justify-center gap-2 rounded-[13px] bg-[#6D3A5B] px-4 py-3 text-xs font-semibold text-white transition hover:bg-[#4D2941] disabled:cursor-wait disabled:opacity-70"
             >
               <Sparkles size={15} />
-              {draftState === "processing" ? "Preparing demo summary..." : "Prepare coordination summary"}
+              {draftState === "processing" ? "Generating AI summary..." : "Prepare coordination summary"}
             </button>
           </div>
 
@@ -230,8 +280,15 @@ export default function AIAssistPage() {
                 <div className="mt-5">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9A9196]">Suggested coordination tasks</p>
                   <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                    <TaskSuggestion title="Confirm transport" />
-                    <TaskSuggestion title="Prepare appointment documents" />
+                    {suggestedTasks.length > 0 ? (
+                      suggestedTasks.map((task, index) => (
+                        <TaskSuggestion key={`${index}-${task}`} title={task} />
+                      ))
+                    ) : (
+                      <p className="text-[11px] text-[#9A9196]">
+                        No explicit coordination tasks identified.
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -302,4 +359,3 @@ function RejectedState({ onPrepare }: { onPrepare: () => void }) {
 function ControlLink({ href, label }: { href: string; label: string }) {
   return <Link href={href} className="flex items-center justify-center gap-1 rounded-[11px] border border-[#CFE0D5] bg-white px-3 py-2 text-[10px] font-semibold text-[#4F8068] transition hover:bg-[#EAF4ED]">{label}<ChevronRight size={13} /></Link>;
 }
-

@@ -25,7 +25,7 @@ export default function AppShell({ children }: AppShellProps) {
   }, [mobileNavOpen]);
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-[#FBF8F7]">
+    <div className="min-h-screen overflow-x-hidden bg-[var(--mc-background)] text-[var(--mc-text)] transition-colors duration-200">
       <Sidebar
         mobileOpen={mobileNavOpen}
         onClose={() => setMobileNavOpen(false)}

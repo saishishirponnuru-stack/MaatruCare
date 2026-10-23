@@ -1,3 +1,10 @@
+export type ApiCoordinationSummary = {
+  summary: string;
+  tasks: string[];
+  model: string;
+  requires_human_review: boolean;
+};
+
 export type ApiPatient = {
   id: number;
   name: string;
@@ -164,6 +171,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  generateCoordinationSummary: (note: string) =>
+    request<ApiCoordinationSummary>("/api/ai/coordination-summary", {
+      method: "POST",
+      body: JSON.stringify({ note }),
+    }),
   getPatients: () => request<ApiPatient[]>(`/api/patients?actor_caregiver_id=${DEMO_ACTOR_CAREGIVER_ID}`),
   getCaregivers: () => request<ApiCaregiver[]>(`/api/caregivers?actor_caregiver_id=${DEMO_ACTOR_CAREGIVER_ID}`),
   getPermissions: () => request<ApiPermission[]>(`/api/permissions?patient_id=${DEMO_PATIENT_ID}&actor_caregiver_id=${DEMO_ACTOR_CAREGIVER_ID}`),
