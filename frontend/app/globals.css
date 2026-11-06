@@ -3,41 +3,41 @@
 :root {
   color-scheme: light;
 
-  --mc-brand: #6d3a5b;
-  --mc-brand-dark: #4d2941;
-  --mc-rose: #b86b87;
+  --mc-brand: #426859;
+  --mc-brand-dark: #314f43;
+  --mc-rose: #b56e59;
 
-  --mc-background: #fbf8f7;
-  --mc-surface: #ffffff;
-  --mc-surface-muted: #f5f0f2;
+  --mc-background: #f7f6f1;
+  --mc-surface: #fffefa;
+  --mc-surface-muted: #eff3ec;
 
-  --mc-text: #211c1f;
-  --mc-muted: #756d72;
-  --mc-border: #e9e1e4;
+  --mc-text: #26312c;
+  --mc-muted: #68746c;
+  --mc-border: #dfe5dc;
 
-  --mc-success: #4f8068;
-  --mc-warning: #b27a3a;
-  --mc-danger: #b85c62;
+  --mc-success: #47765c;
+  --mc-warning: #9b692e;
+  --mc-danger: #a85553;
 }
 
 html[data-theme="dark"] {
   color-scheme: dark;
 
-  --mc-background: #171419;
-  --mc-surface: #221d24;
-  --mc-surface-muted: #2b242d;
+  --mc-background: #151d18;
+  --mc-surface: #1d2821;
+  --mc-surface-muted: #26352b;
 
-  --mc-text: #f5eff3;
-  --mc-muted: #c0b5bf;
-  --mc-border: #493d49;
+  --mc-text: #eef3ed;
+  --mc-muted: #b6c2b8;
+  --mc-border: #3b4c40;
 
-  --mc-brand: #d5a5c1;
-  --mc-brand-dark: #f0c9df;
-  --mc-rose: #e0a0bc;
+  --mc-brand: #a6ccb2;
+  --mc-brand-dark: #cde2d2;
+  --mc-rose: #d99a83;
 
-  --mc-success: #8bc9a5;
-  --mc-warning: #efc17e;
-  --mc-danger: #ff9da5;
+  --mc-success: #8fc79d;
+  --mc-warning: #edc47f;
+  --mc-danger: #f19a8f;
 }
 
 * {
@@ -50,9 +50,32 @@ html {
 
 body {
   margin: 0;
-  background: var(--mc-background);
+  background:
+    radial-gradient(ellipse at 8% 0%, rgba(221, 232, 219, 0.44), transparent 35rem),
+    var(--mc-background);
   color: var(--mc-text);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: "Segoe UI", Aptos, system-ui, -apple-system, sans-serif;
+  line-height: 1.5;
+}
+
+main h1,
+main h2 {
+  font-family: Georgia, "Times New Roman", serif;
+  text-wrap: balance;
+}
+
+main h1 {
+  letter-spacing: -0.045em;
+}
+
+button:not(:disabled),
+a[href] {
+  transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+:focus-visible {
+  outline: 2px solid var(--mc-brand);
+  outline-offset: 3px;
 }
 
 button,
@@ -67,7 +90,7 @@ button {
 }
 
 ::selection {
-  background: rgba(109, 58, 91, 0.2);
+  background: color-mix(in srgb, var(--mc-brand) 20%, transparent);
 }
 
 html[data-larger-text="true"] {
@@ -131,6 +154,59 @@ aside > div[class*="flex-1"] > div[class*="flex-1"] {
   min-height: 0;
 }
 
+/* Bridge the existing Tailwind palette to the shared MaatruCare tokens. */
+html [class~="bg-[#6D3A5B]"],
+html [class~="hover:bg-[#4D2941]"]:hover {
+  background-color: var(--mc-brand) !important;
+}
+
+html [class~="text-[#6D3A5B]"],
+html [class~="hover:text-[#6D3A5B]"]:hover {
+  color: var(--mc-brand) !important;
+}
+
+html [class~="bg-[#FBF8F7]"],
+html [class~="hover:bg-[#FBF8F7]"]:hover {
+  background-color: var(--mc-background) !important;
+}
+
+html :is(
+  [class~="bg-[#F8F2F6]"],
+  [class~="bg-[#F3EAF0]"],
+  [class~="bg-[#F4EDF1]"],
+  [class~="bg-[#F0E5EB]"],
+  [class~="bg-[#F5F1F3]"],
+  [class~="bg-[#EBDCE5]"],
+  [class~="bg-[#E8D7E0]"]
+) {
+  background-color: var(--mc-surface-muted) !important;
+}
+
+html [class~="text-[#211C1F]"] {
+  color: var(--mc-text) !important;
+}
+
+html :is([class~="text-[#756D72]"], [class~="text-[#9A9196]"]) {
+  color: var(--mc-muted) !important;
+}
+
+html :is(
+  [class~="border-[#E9E1E4]"],
+  [class~="border-[#E4D7DF]"],
+  [class~="border-[#F0E9EC]"],
+  [class~="border-[#D8C5D0]"]
+) {
+  border-color: var(--mc-border) !important;
+}
+
+html [class~="bg-white"] {
+  background-color: var(--mc-surface) !important;
+}
+
+html [class~="ring-white"] {
+  --tw-ring-color: var(--mc-surface) !important;
+}
+
 /* MAATRUCARE DARK THEME COMPATIBILITY */
 
 /* Shared light surfaces */
@@ -187,11 +263,11 @@ html[data-theme="dark"] [class~="hover:text-[#211C1F]"]:hover {
 /* MAATRUCARE DARK THEME REFINEMENTS V2 */
 
 html[data-theme="dark"] {
-  --mc-info-surface: #2c2430;
-  --mc-success-surface: #203329;
-  --mc-danger-surface: #392428;
-  --mc-warning-surface: #382c24;
-  --mc-hover-surface: #342b36;
+  --mc-info-surface: #28342b;
+  --mc-success-surface: #203328;
+  --mc-danger-surface: #382724;
+  --mc-warning-surface: #3a3022;
+  --mc-hover-surface: #314137;
 }
 
 /* Soft information and neutral panels */

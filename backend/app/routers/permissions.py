@@ -42,11 +42,18 @@ def update_permission(payload: PermissionUpdate, db: Session = Depends(get_db)) 
 			)
 		).all()
 	)
-	if len(permission_records) != 1:
-		raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Permission state is not uniquely defined")
-	permission = permission_records[0]
+	if len(permission_records) > 1:
+		raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Multiple permission records exist for this caregiver and permission")
+	if not permission_records:
+		if not payload.enabled:
+			raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Permission record does not exist to revoke")
+		permission = Permission(caregiver_id=target.id, permission_name=payload.permission_name, enabled=False)
+		db.add(permission)
+		db.flush()
+	else:
+		permission = permission_records[0]
 	if permission.enabled == payload.enabled:
-		raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Permission is already in the requested state")
+		return permission
 	try:
 		permission.enabled = payload.enabled
 		db.add(

@@ -22,7 +22,7 @@ const caregivers = [
     role: "Primary caregiver",
     access: "Care coordination",
     initials: "RR",
-    status: "Active",
+    status: "Sample",
   },
   {
     name: "Lakshmi Rao",
@@ -30,7 +30,7 @@ const caregivers = [
     role: "Family caregiver",
     access: "Appointments & tasks",
     initials: "LR",
-    status: "Active",
+    status: "Sample",
   },
   {
     name: "Priya Rao",
@@ -38,7 +38,7 @@ const caregivers = [
     role: "Support caregiver",
     access: "Selected updates",
     initials: "PR",
-    status: "Active",
+    status: "Sample",
   },
 ] as const;
 
@@ -50,36 +50,16 @@ const permissionKeys = [
 ] as const;
 
 type Caregiver = (typeof caregivers)[number];
-type CaregiverName = Caregiver["name"];
 type PermissionKey = (typeof permissionKeys)[number];
-type CaregiverPermissions = Record<PermissionKey, boolean>;
 
-const initialPermissions: Record<CaregiverName, CaregiverPermissions> = {
-  "Rahul Rao": {
-    Appointments: true,
-    "Coordination tasks": true,
-    "Care handoffs": true,
-    "Approved care updates": true,
-  },
-  "Lakshmi Rao": {
-    Appointments: true,
-    "Coordination tasks": true,
-    "Care handoffs": false,
-    "Approved care updates": true,
-  },
-  "Priya Rao": {
-    Appointments: false,
-    "Coordination tasks": true,
-    "Care handoffs": false,
-    "Approved care updates": true,
-  },
-};
 
 export default function CareCirclePage() {
   const { permissions, updateConsentPermission } = useMaatruCareDemo();
   const [selectedCaregiver, setSelectedCaregiver] =
     useState<Caregiver | null>(null);
   const [feedback, setFeedback] = useState("");
+  const [pendingPermission, setPendingPermission] =
+    useState<PermissionKey | null>(null);
   return (
     <AppShell>
       <div>
@@ -153,13 +133,13 @@ export default function CareCirclePage() {
               </h2>
 
               <p className="mt-1 text-[11px] text-[#9A9196]">
-                3 people currently connected
+                3 fictional demo profiles
               </p>
             </div>
 
             <div className="flex items-center gap-1.5 text-[10px] font-medium text-[#4F8068]">
               <CheckCircle2 size={13} />
-              All connections active
+              Demo profiles
             </div>
           </div>
 
@@ -327,7 +307,13 @@ export default function CareCirclePage() {
                         return (
                             <button
                             key={permission}
+                            type="button"
+                            aria-pressed={enabled}
+                            disabled={pendingPermission !== null}
+                            aria-label={`${permission}: ${enabled ? "enabled" : "disabled"}`}
                             onClick={async () => {
+    if (pendingPermission !== null) return;
+    setPendingPermission(permission);
     try {
         await updateConsentPermission(
             caregiverName,
@@ -341,12 +327,14 @@ export default function CareCirclePage() {
                 ? error.message
                 : "Unable to update permission."
         );
+    } finally {
+        setPendingPermission(null);
     }
 }}
-                            className="flex w-full items-center justify-between rounded-[14px] border border-[#E9E1E4] px-4 py-3 text-left transition hover:bg-[#FBF8F7]"
+                            className="flex w-full items-center justify-between rounded-[14px] border border-[#E9E1E4] px-4 py-3 text-left transition hover:bg-[#FBF8F7] disabled:cursor-wait disabled:opacity-65"
                             >
                             <span className="text-xs font-medium text-[#211C1F]">
-                                {permission}
+                                {pendingPermission === permission ? "Saving permission…" : permission}
                             </span>
 
                             <span
@@ -401,11 +389,11 @@ export default function CareCirclePage() {
 
                         <div>
                           <p className="text-[11px] font-semibold text-[#211C1F]">
-                            Access currently active
+                            Illustrative permission state
                           </p>
 
                           <p className="mt-1 text-[10px] leading-4 text-[#9A9196]">
-                            Permissions were last reviewed by Ananya.
+                            This activity history is illustrative demo content.
                           </p>
                         </div>
                       </div>

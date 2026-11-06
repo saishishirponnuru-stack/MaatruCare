@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import threading
 import time
 from collections import defaultdict
@@ -13,13 +14,26 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/ai", tags=["AI"])
 
-DEMO_NOTES = {
-    "priya will collect the appointment documents. arjun will arrange transport for the clinic visit.",
-    "rahul will arrange transport for the appointment. lakshmi will prepare the necessary documents.",
-}
-
 RATE_LIMIT = 5
 RATE_WINDOW = 3600
+PERSONAL_DATA_PATTERNS = (
+    re.compile(r"\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b"),
+    re.compile(r"(?<!\w)(?:\+?\d[\d ().-]{7,}\d)(?!\w)"),
+    re.compile(r"\b(?:patient\s*id|mrn|medical record number|date of birth|dob|ssn)\s*[:#-]?\s*[A-Za-z0-9/-]+", re.IGNORECASE),
+)
+CLINICAL_CONTENT_PATTERN = re.compile(
+    r"\b(?:diagnos\w*|symptom\w*|medication\w*|prescription\w*|dosage|lab results?|test results?|blood pressure|ultrasound|scan findings?|treat\w*|therap\w*|bleed\w*|hemorrhag\w*)\b",
+    re.IGNORECASE,
+)
+
+
+def contains_personal_data(note: str) -> bool:
+    if PERSONAL_DATA_PATTERNS[0].search(note) or PERSONAL_DATA_PATTERNS[2].search(note):
+        return True
+    return any(
+        len(re.sub(r"\D", "", candidate.group())) >= 10
+        for candidate in PERSONAL_DATA_PATTERNS[1].finditer(note)
+    )
 
 _request_times = defaultdict(list)
 _lock = threading.Lock()
@@ -37,12 +51,15 @@ def coordination_summary(payload: CoordinationRequest, request: Request):
             detail="Public AI demo is currently disabled.",
         )
 
-    normalized_note = " ".join(payload.note.lower().split())
-
-    if normalized_note not in DEMO_NOTES:
+    if contains_personal_data(payload.note):
         raise HTTPException(
             status_code=400,
-            detail="This public demo accepts only approved synthetic notes.",
+            detail="Remove personal identifiers; use fictional coordination notes only.",
+        )
+    if CLINICAL_CONTENT_PATTERN.search(payload.note):
+        raise HTTPException(
+            status_code=400,
+            detail="Clinical details are not supported; submit non-clinical coordination only.",
         )
 
     client_ip = request.client.host if request.client else "unknown"

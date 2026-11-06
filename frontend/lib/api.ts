@@ -100,8 +100,8 @@ export type ApiTaskCreate = {
 
 export type ApiTaskUpdate = {
   title?: string;
-  owner_id?: number;
-  owner_patient_id?: number;
+  owner_id?: number | null;
+  owner_patient_id?: number | null;
   due_date?: string;
   category?: string;
   actor_caregiver_id: number;

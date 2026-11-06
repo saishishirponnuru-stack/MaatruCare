@@ -11,6 +11,7 @@ import {
 
 import {
   api,
+  ApiError,
   DEMO_ACTOR_CAREGIVER_ID,
   DEMO_PATIENT_ID,
   type ApiCaregiver,
@@ -262,6 +263,12 @@ function mapPermissions(
   records: ApiPermission[],
   caregivers: ApiCaregiver[]
 ): DemoPermissions {
+  const permissionCaregiverNames = new Map<number, DemoOwner>();
+  for (const caregiver of caregivers) {
+    const name = owners.find((owner) => owner === caregiver.name);
+    if (name) permissionCaregiverNames.set(caregiver.id, name);
+  }
+
   const mapped: DemoPermissions = {
     "Ananya Rao": {
       Appointments: false,
@@ -290,13 +297,7 @@ function mapPermissions(
   };
 
   records.forEach((record) => {
-    const permissionCaregiverNames: Record<number, DemoOwner> = {
-      1: "Rahul Rao",
-      2: "Lakshmi Rao",
-      3: "Priya Rao",
-    };
-
-    const name = permissionCaregiverNames[record.caregiver_id];
+    const name = permissionCaregiverNames.get(record.caregiver_id);
 
     const permissionNames: readonly string[] = [
       "Appointments",
@@ -355,6 +356,7 @@ export function MaatruCareDemoProvider({
       },
     });
 
+  const [caregiverRecords, setCaregiverRecords] = useState<ApiCaregiver[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -381,10 +383,16 @@ export function MaatruCareDemoProvider({
       ] = results;
 
       if (caregiversResult.status === "rejected") {
-        throw new Error("Caregiver data could not be loaded.");
+        const denied = caregiversResult.reason instanceof ApiError && caregiversResult.reason.status === 403;
+        throw new Error(
+          denied
+            ? "Caregiver access was denied. Ask the authorized patient controller to enable the Coordination tasks permission; access checks remain active."
+            : "Caregiver data could not be loaded."
+        );
       }
 
       const caregivers = caregiversResult.value;
+      setCaregiverRecords(caregivers);
 
       if (tasksResult.status === "fulfilled") {
         const uniqueTasks = new Map<string, DemoTask>();
@@ -407,7 +415,12 @@ export function MaatruCareDemoProvider({
 
         setTasks(Array.from(uniqueTasks.values()));
       } else {
-        errors.push("Tasks could not be loaded.");
+        const denied = tasksResult.reason instanceof ApiError && tasksResult.reason.status === 403;
+        errors.push(
+          denied
+            ? "Task access was denied. Ask the authorized patient controller to review the Coordination tasks permission."
+            : "Tasks could not be loaded."
+        );
       }
 
       if (handoffsResult.status === "fulfilled") {
@@ -477,12 +490,23 @@ export function MaatruCareDemoProvider({
     throw new Error(message);
   }
 
-  const caregiverIds: Record<DemoOwner, number> = {
-    "Ananya Rao": DEMO_ACTOR_CAREGIVER_ID,
-    "Rahul Rao": 1,
-    "Lakshmi Rao": 2,
-    "Priya Rao": 3,
-  };
+  function caregiverIdFor(owner: DemoOwner): number {
+    const caregiver = caregiverRecords.find((record) => record.name === owner);
+    if (!caregiver) throw new Error(`No backend caregiver is available for ${owner}.`);
+    return caregiver.id;
+  }
+
+  function taskOwnerCreateFields(owner: DemoOwner): { owner_id?: number; owner_patient_id?: number } {
+    return owner === "Ananya Rao"
+      ? { owner_patient_id: DEMO_PATIENT_ID }
+      : { owner_id: caregiverIdFor(owner) };
+  }
+
+  function taskOwnerUpdateFields(owner: DemoOwner): { owner_id: number | null; owner_patient_id: number | null } {
+    return owner === "Ananya Rao"
+      ? { owner_id: null, owner_patient_id: DEMO_PATIENT_ID }
+      : { owner_id: caregiverIdFor(owner), owner_patient_id: null };
+  }
 
   async function addTask(
     task: Omit<DemoTask, "id" | "status" | "createdBy">
@@ -490,7 +514,7 @@ export function MaatruCareDemoProvider({
     const created = await api.createTask({
       patient_id: DEMO_PATIENT_ID,
       title: task.title,
-      owner_id: caregiverIds[task.owner],
+      ...taskOwnerCreateFields(task.owner),
       due_date: task.dueDate,
       category: task.category,
       actor_caregiver_id: DEMO_ACTOR_CAREGIVER_ID,
@@ -537,10 +561,9 @@ export function MaatruCareDemoProvider({
     try {
       await api.updateTask(Number(id), {
         title: patch.title,
-        owner_id:
-          patch.owner && patch.owner !== task.owner
-            ? caregiverIds[patch.owner]
-            : undefined,
+        ...(patch.owner && patch.owner !== task.owner
+          ? taskOwnerUpdateFields(patch.owner)
+          : {}),
         due_date: patch.dueDate,
         category: patch.category,
         actor_caregiver_id: DEMO_ACTOR_CAREGIVER_ID,
@@ -620,7 +643,7 @@ export function MaatruCareDemoProvider({
 
     try {
       await api.updateTask(Number(id), {
-        owner_id: caregiverIds[owner],
+        ...taskOwnerUpdateFields(owner),
         actor_caregiver_id: DEMO_ACTOR_CAREGIVER_ID,
       });
 
@@ -647,8 +670,8 @@ export function MaatruCareDemoProvider({
     const created = await api.createHandoff({
       patient_id: DEMO_PATIENT_ID,
       title: handoff.title,
-      from_caregiver_id: caregiverIds[handoff.from],
-      to_caregiver_id: caregiverIds[handoff.to],
+      from_caregiver_id: caregiverIdFor(handoff.from),
+      to_caregiver_id: caregiverIdFor(handoff.to),
       reason: handoff.reason,
       actor_caregiver_id: DEMO_ACTOR_CAREGIVER_ID,
     });
@@ -744,7 +767,7 @@ export function MaatruCareDemoProvider({
     try {
       await api.acknowledgeHandoff(
         Number(id),
-        caregiverIds[handoff.to]
+        caregiverIdFor(handoff.to)
       );
 
       void api.getTimeline()
@@ -785,7 +808,7 @@ export function MaatruCareDemoProvider({
     try {
       await api.completeHandoff(
         Number(id),
-        caregiverIds[handoff.to]
+        caregiverIdFor(handoff.to)
       );
 
       void api.getTimeline()

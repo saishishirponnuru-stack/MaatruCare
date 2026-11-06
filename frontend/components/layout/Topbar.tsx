@@ -27,7 +27,7 @@ export default function Topbar({
       <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
         <motion.button
           type="button"
-          aria-label="Open navigation"
+          aria-label={mobileMenuOpen ? "Close navigation" : "Open navigation"}
           aria-expanded={mobileMenuOpen}
           onClick={onMenu}
           whileTap={{ scale: 0.96 }}
@@ -88,7 +88,6 @@ export default function Topbar({
           className="relative flex h-10 w-10 items-center justify-center rounded-[11px] border border-[var(--mc-border)] bg-[var(--mc-surface)] text-[var(--mc-muted)]"
         >
           <Bell size={18} />
-          <span className="absolute right-[9px] top-[8px] h-2 w-2 rounded-full bg-[#B86B87] ring-2 ring-white" />
         </motion.button>
 
         <button

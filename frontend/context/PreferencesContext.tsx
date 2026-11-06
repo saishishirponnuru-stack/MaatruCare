@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import {
   createContext,
@@ -58,6 +58,8 @@ export function PreferencesProvider({
         if (parsed && typeof parsed === "object") {
           const value = parsed as Partial<AccessibilityPreferences>;
 
+          // Hydrate browser-only preferences after mount to avoid SSR/client markup mismatch.
+          // eslint-disable-next-line react-hooks/set-state-in-effect
           setPreferences({
             theme: value.theme === "dark" ? "dark" : "light",
             largerText:

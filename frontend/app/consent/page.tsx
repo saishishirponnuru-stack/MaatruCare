@@ -37,8 +37,6 @@ type Caregiver = {
   lastUpdate: string;
 };
 
-type CaregiverPermissions = Record<PermissionKey, boolean>;
-
 const caregivers: Caregiver[] = [
   {
     name: "Rahul Rao",
@@ -62,27 +60,6 @@ const caregivers: Caregiver[] = [
     lastUpdate: "Updated 22 Sep",
   },
 ];
-
-const initialPermissions: Record<CaregiverName, CaregiverPermissions> = {
-  "Rahul Rao": {
-    Appointments: true,
-    "Coordination tasks": true,
-    "Care handoffs": true,
-    "Approved care updates": true,
-  },
-  "Lakshmi Rao": {
-    Appointments: true,
-    "Coordination tasks": true,
-    "Care handoffs": false,
-    "Approved care updates": true,
-  },
-  "Priya Rao": {
-    Appointments: false,
-    "Coordination tasks": true,
-    "Care handoffs": false,
-    "Approved care updates": true,
-  },
-};
 
 const permissionDescriptions: Record<PermissionKey, string> = {
   Appointments: "Upcoming appointment details and scheduling information.",
@@ -122,9 +99,11 @@ export default function ConsentPage() {
   const { permissions, updateConsentPermission } = useMaatruCareDemo();
   const [selectedCaregiver, setSelectedCaregiver] =
     useState<CaregiverName>("Rahul Rao");
-  const [statuses, setStatuses] =
+  const [statuses] =
     useState<Record<CaregiverName, AccessStatus>>(initialStatuses);
   const [feedback, setFeedback] = useState("");
+  const [pendingPermission, setPendingPermission] =
+    useState<PermissionKey | null>(null);
 
   const summary = useMemo(() => {
     const activeCaregivers = caregivers.filter(
@@ -159,12 +138,15 @@ export default function ConsentPage() {
   ).length;
 
   async function togglePermission(permission: PermissionKey) {
-    if (selectedIsRevoked) return;
+    if (selectedIsRevoked || pendingPermission !== null) return;
+    setPendingPermission(permission);
     try {
       await updateConsentPermission(selectedCaregiver, permission, !permissions[selectedCaregiver][permission]);
       setFeedback("Permission updated and persisted.");
     } catch (error) {
       setFeedback(error instanceof Error ? error.message : "Unable to update permission.");
+    } finally {
+      setPendingPermission(null);
     }
   }
 
@@ -309,9 +291,10 @@ export default function ConsentPage() {
                     role="switch"
                     aria-checked={enabled && !selectedIsRevoked}
                     aria-label={`${permission} for ${selectedCaregiver}`}
-                    disabled={selectedIsRevoked}
+                    aria-busy={pendingPermission === permission}
+                    disabled={selectedIsRevoked || pendingPermission !== null}
                     onClick={() => togglePermission(permission)}
-                    className={`relative h-7 w-12 shrink-0 rounded-full p-1 transition ${enabled && !selectedIsRevoked ? "bg-[#6D3A5B]" : "bg-[#DCD3D7]"} ${selectedIsRevoked ? "cursor-not-allowed opacity-60" : ""}`}
+                    className={`relative h-7 w-12 shrink-0 rounded-full p-1 transition disabled:cursor-wait disabled:opacity-60 ${enabled && !selectedIsRevoked ? "bg-[#6D3A5B]" : "bg-[#DCD3D7]"} ${selectedIsRevoked ? "cursor-not-allowed opacity-60" : ""}`}
                   >
                     <span className={`block h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${enabled && !selectedIsRevoked ? "translate-x-5" : "translate-x-0"}`} />
                   </button>
