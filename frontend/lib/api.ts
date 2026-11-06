@@ -210,6 +210,7 @@ export const api = {
   updateWater: (id: number, payload: Record<string, unknown>) => request(`/api/lifestyle/water/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
   deleteWater: (id: number) => request(`/api/lifestyle/water/${id}?actor_caregiver_id=${DEMO_ACTOR_CAREGIVER_ID}`, { method: "DELETE" }),
   updateLifestylePreferences: (payload: Record<string, unknown>) => request("/api/lifestyle/preferences", { method: "PUT", body: JSON.stringify(payload) }),
+  resetLifestyle: (payload: Record<string, unknown>) => request<{ deleted: Record<string, number>; preferences_reset: boolean }>("/api/lifestyle/reset", { method: "POST", body: JSON.stringify(payload) }),
   createSleep: (payload: Record<string, unknown>) => request("/api/lifestyle/sleep", { method: "POST", body: JSON.stringify(payload) }),
   updateSleep: (id: number, payload: Record<string, unknown>) => request(`/api/lifestyle/sleep/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
   createWeight: (payload: Record<string, unknown>) => request("/api/lifestyle/weight", { method: "POST", body: JSON.stringify(payload) }),

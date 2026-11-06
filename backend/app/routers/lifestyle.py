@@ -1,3 +1,4 @@
+import os
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -6,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..lifestyle_models import ActivityLog, ActivityRoutine, DietAdherence, DietRecommendation, LifestylePreference, SleepLog, WaterLog, WeightEntry
-from ..lifestyle_schemas import ActivityLogCreate, ActivityRoutineCreate, DietAdherenceCreate, DietRecommendationCreate, LifestylePreferenceUpdate, LifestyleResponse, SleepCreate, WaterCreate, WeightCreate
+from ..lifestyle_schemas import ActivityLogCreate, ActivityRoutineCreate, DietAdherenceCreate, DietRecommendationCreate, LifestylePreferenceUpdate, LifestyleResetRequest, LifestyleResetResponse, LifestyleResponse, SleepCreate, WaterCreate, WeightCreate
 from ..models import Patient
 from ..services.access_service import require_patient_caregiver, require_permission
 
@@ -69,6 +70,32 @@ def save(db: Session, record):
     db.commit()
     db.refresh(record)
     return record
+
+
+@router.post("/reset", response_model=LifestyleResetResponse)
+def reset_lifestyle(payload: LifestyleResetRequest, db: Session = Depends(get_db)):
+    if os.getenv("MAATRUCARE_DEMO_RESET_ENABLED", "false").lower() != "true":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Demo reset is disabled")
+    access(db, payload.actor_caregiver_id, payload.patient_id, True)
+    routines = db.scalars(select(ActivityRoutine).where(ActivityRoutine.patient_id == payload.patient_id)).all()
+    recommendations = db.scalars(select(DietRecommendation).where(DietRecommendation.patient_id == payload.patient_id)).all()
+    routine_ids = [routine.id for routine in routines]
+    recommendation_ids = [recommendation.id for recommendation in recommendations]
+    try:
+        counts = {
+            "water": db.query(WaterLog).filter(WaterLog.patient_id == payload.patient_id).delete(synchronize_session=False),
+            "sleep": db.query(SleepLog).filter(SleepLog.patient_id == payload.patient_id).delete(synchronize_session=False),
+            "weight": db.query(WeightEntry).filter(WeightEntry.patient_id == payload.patient_id).delete(synchronize_session=False),
+            "diet_adherence": db.query(DietAdherence).filter(DietAdherence.recommendation_id.in_(recommendation_ids)).delete(synchronize_session=False) if recommendation_ids else 0,
+            "activity_logs": db.query(ActivityLog).filter(ActivityLog.routine_id.in_(routine_ids)).delete(synchronize_session=False) if routine_ids else 0,
+        }
+        if payload.reset_preferences:
+            counts["preferences"] = db.query(LifestylePreference).filter(LifestylePreference.patient_id == payload.patient_id).delete(synchronize_session=False)
+        db.commit()
+        return {"deleted": counts, "preferences_reset": payload.reset_preferences}
+    except Exception:
+        db.rollback()
+        raise
 
 
 @router.post("/water")

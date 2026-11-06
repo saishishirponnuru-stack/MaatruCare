@@ -101,6 +101,17 @@ class LifestylePreferenceUpdate(BaseModel):
     sleep_goal_minutes: int | None = Field(default=None, ge=1, le=1440)
 
 
+class LifestyleResetRequest(BaseModel):
+    patient_id: int = 1
+    actor_caregiver_id: int
+    reset_preferences: bool = False
+
+
+class LifestyleResetResponse(BaseModel):
+    deleted: dict[str, int]
+    preferences_reset: bool
+
+
 class LifestyleResponseBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

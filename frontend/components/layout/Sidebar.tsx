@@ -19,14 +19,14 @@ import { motion } from "framer-motion";
 import type { RefObject } from "react";
 
 const navigation = [
-  { label: "Home", href: "/dashboard", icon: Home, iconColor: "text-[#356B53]", iconBg: "bg-[#EAF3ED]" },
-  { label: "Journey", href: "/journey", icon: Sprout, iconColor: "text-[#75658F]", iconBg: "bg-[#F0ECF7]" },
-  { label: "Care Circle", href: "/care-circle", icon: UsersRound, iconColor: "text-[#3C7E7B]", iconBg: "bg-[#E8F4F2]" },
-  { label: "Timeline", href: "/timeline", icon: Clock3, iconColor: "text-[#5E7485]", iconBg: "bg-[#EAF0F3]" },
-  { label: "Tasks", href: "/tasks", icon: CheckSquare, iconColor: "text-[#A16F32]", iconBg: "bg-[#FBF1DF]" },
-  { label: "Handoffs", href: "/handoffs", icon: ArrowLeftRight, iconColor: "text-[#5C62A1]", iconBg: "bg-[#ECECFA]" },
-  { label: "Consent", href: "/consent", icon: ShieldCheck, iconColor: "text-[#3D8061]", iconBg: "bg-[#E7F4EB]" },
-  { label: "Lifestyle", href: "/lifestyle", icon: Activity, iconColor: "text-[#3B86B5]", iconBg: "bg-[#E6F3FA]" },
+  { label: "Home", href: "/dashboard", icon: Home, iconTone: "slate" },
+  { label: "Journey", href: "/journey", icon: Sprout, iconTone: "rose" },
+  { label: "Care Circle", href: "/care-circle", icon: UsersRound, iconTone: "violet" },
+  { label: "Timeline", href: "/timeline", icon: Clock3, iconTone: "sky" },
+  { label: "Tasks", href: "/tasks", icon: CheckSquare, iconTone: "amber" },
+  { label: "Handoffs", href: "/handoffs", icon: ArrowLeftRight, iconTone: "indigo" },
+  { label: "Consent", href: "/consent", icon: ShieldCheck, iconTone: "teal" },
+  { label: "Lifestyle", href: "/lifestyle", icon: Activity, iconTone: "hydration" },
 ];
 
 interface SidebarProps {
@@ -109,7 +109,7 @@ export default function Sidebar({
                     />
                   )}
 
-                  <span className={`flex h-7 w-7 items-center justify-center rounded-[9px] ${item.iconBg} ${item.iconColor}`}><Icon size={16} strokeWidth={active ? 2.3 : 1.9} aria-hidden="true" /></span>
+                  <span className={`mc-feature-icon mc-feature-icon--${item.iconTone} flex h-7 w-7 items-center justify-center rounded-[9px]`}><Icon size={16} strokeWidth={active ? 2.3 : 1.9} aria-hidden="true" /></span>
                   <span>{item.label}</span>
                 </motion.div>
               </Link>
@@ -128,7 +128,7 @@ export default function Sidebar({
                 : "text-[var(--mc-muted)] hover:bg-[var(--mc-background)] hover:text-[var(--mc-text)]"
             }`}
           >
-            <Settings size={18} strokeWidth={1.9} />
+            <span className="mc-feature-icon mc-feature-icon--slate flex h-7 w-7 items-center justify-center rounded-[9px]"><Settings size={16} strokeWidth={1.9} /></span>
             <span>Settings</span>
           </motion.div>
         </Link>

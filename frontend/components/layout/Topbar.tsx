@@ -37,7 +37,7 @@ export default function Topbar({
   const title = pageTitles.find(([path]) => pathname === path || pathname.startsWith(`${path}/`))?.[1] ?? "Care coordination";
 
   return (
-    <header className="fixed left-0 right-0 top-0 z-30 flex h-[72px] items-center justify-between border-b border-[var(--mc-border)] bg-[var(--mc-background)] px-3 backdrop-blur-md sm:px-4 lg:left-[250px] lg:h-[82px] lg:px-8">
+    <header className="glass-surface fixed left-0 right-0 top-0 z-30 flex h-[72px] items-center justify-between border-b border-[var(--mc-border)] bg-[var(--mc-background)] px-3 backdrop-blur-md sm:px-4 lg:left-[250px] lg:h-[82px] lg:px-8">
       <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
         <motion.button
           ref={menuButtonRef}
