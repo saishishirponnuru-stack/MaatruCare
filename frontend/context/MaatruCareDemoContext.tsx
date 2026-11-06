@@ -60,8 +60,6 @@ export type DemoHandoff = {
   from: DemoOwner;
   to: DemoOwner;
   reason: string;
-  task: string;
-  contexts: string[];
   stage: DemoHandoffStage;
   created: string;
   clarification?: string;
@@ -102,8 +100,6 @@ const initialHandoffs: DemoHandoff[] = [
     from: "Rahul Rao",
     to: "Lakshmi Rao",
     reason: "Transport and appointment coordination responsibility",
-    task: "Confirm transport; Prepare appointment documents",
-    contexts: ["Appointment details", "Coordination task details"],
     stage: "Sent",
     created: "26 Sep",
   },
@@ -141,11 +137,6 @@ export type MaatruCareDemoContextValue = {
 
   sendHandoff: (id: string) => Promise<void>;
   acknowledgeHandoff: (id: string) => Promise<void>;
-
-  requestHandoffChanges: (
-    id: string,
-    clarification: string
-  ) => Promise<void>;
 
   completeHandoff: (id: string) => Promise<void>;
 
@@ -226,8 +217,6 @@ function mapHandoff(
     from,
     to,
     reason: handoff.reason,
-    task: "Coordination responsibility",
-    contexts: [],
     stage,
     created: new Date(
       handoff.created_at
@@ -839,15 +828,6 @@ export function MaatruCareDemoProvider({
       );
     }
 
-    const permissionCaregiverIds: Record<
-      Exclude<DemoOwner, "Ananya Rao">,
-      number
-    > = {
-      "Rahul Rao": 1,
-      "Lakshmi Rao": 2,
-      "Priya Rao": 3,
-    };
-
     const previousEnabled =
       permissions[caregiver][permission];
 
@@ -864,8 +844,7 @@ export function MaatruCareDemoProvider({
     try {
       await api.updatePermission({
         patient_id: DEMO_PATIENT_ID,
-        caregiver_id:
-          permissionCaregiverIds[caregiver],
+        caregiver_id: caregiverIdFor(caregiver),
         permission_name: permission,
         enabled,
         actor_caregiver_id:
@@ -909,10 +888,6 @@ export function MaatruCareDemoProvider({
       createHandoff,
       sendHandoff,
       acknowledgeHandoff,
-      requestHandoffChanges: () =>
-        unsupportedMutation(
-          "Handoff review requests are not supported by the backend yet."
-        ),
       completeHandoff,
       addTimelineEvent: () =>
         unsupportedMutation(

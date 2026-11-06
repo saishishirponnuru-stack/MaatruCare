@@ -16,14 +16,6 @@ import {
 } from "lucide-react";
 import { useMaatruCareDemo } from "@/context/MaatruCareDemoContext";
 
-const phases = [
-  "All phases",
-  "Preconception",
-  "Pregnancy",
-  "Postnatal",
-  "Early motherhood",
-] as const;
-
 const filters = [
   "All",
   "Appointments",
@@ -32,13 +24,11 @@ const filters = [
   "Tasks",
 ] as const;
 
-type Phase = (typeof phases)[number];
 type Filter = (typeof filters)[number];
 type EventType = "Appointment" | "Care update" | "Coordination" | "Task";
 
 type TimelineEvent = {
   id: string;
-  phase: Phase | null;
   date: string;
   title: string;
   type: EventType;
@@ -72,14 +62,11 @@ function formatDate(date: string) {
 
 export default function TimelinePage() {
   const { timeline } = useMaatruCareDemo();
-  const [phase, setPhase] = useState<Phase>("All phases");
   const [filter, setFilter] = useState<Filter>("All");
 
   const visibleEvents = useMemo(() => {
     const sharedEvents: TimelineEvent[] = timeline.map((event) => {
       const title = event.title.toLowerCase();
-      const phase: Phase | null = null;
-
       const validTypes: EventType[] = ["Appointment", "Care update", "Coordination", "Task"];
       const type = validTypes.includes(event.eventType as EventType)
         ? event.eventType as EventType
@@ -90,7 +77,6 @@ export default function TimelinePage() {
 
       return {
         id: event.id,
-        phase,
         date: event.eventDate,
         title: event.title,
         type,
@@ -101,11 +87,10 @@ export default function TimelinePage() {
     });
 
     return sharedEvents.filter((event) => {
-      if (phase !== "All phases" && event.phase !== phase) return false;
       if (filter === "All") return true;
       return event.type === filterToType[filter];
     });
-  }, [filter, phase, timeline]);
+  }, [filter, timeline]);
 
   return (
     <AppShell>
@@ -135,31 +120,9 @@ export default function TimelinePage() {
           </div>
         </div>
 
-        <section className="mt-8 overflow-hidden rounded-[22px] border border-[#E9E1E4] bg-white p-4 shadow-[0_8px_30px_rgba(33,28,31,0.035)] sm:p-5">
-          <p className="px-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9A9196]">
-            Journey phase
-          </p>
-
-          <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
-            {phases.map((item) => {
-              const isActive = phase === item;
-
-              return (
-                <button
-                  key={item}
-                  onClick={() => setPhase(item)}
-                  className={`rounded-[13px] px-3 py-2.5 text-[12px] font-semibold transition ${
-                    isActive
-                      ? "bg-[#6D3A5B] text-white"
-                      : "bg-[#FBF8F7] text-[#756D72] hover:bg-[#F3EAF0] hover:text-[#6D3A5B]"
-                  }`}
-                >
-                  {item}
-                </button>
-              );
-            })}
-          </div>
-        </section>
+        <div role="note" className="mt-8 rounded-[14px] border border-[#E9E1E4] bg-[#FBF8F7] px-4 py-3 text-[11px] leading-5 text-[#756D72]">
+          Journey-phase filtering is unavailable because timeline records do not include a verified phase field. Event-type filters below use the event data returned by the backend.
+        </div>
 
         <div className="mt-6 flex flex-wrap gap-2">
           {filters.map((item) => {
@@ -168,6 +131,8 @@ export default function TimelinePage() {
             return (
               <button
                 key={item}
+                type="button"
+                aria-pressed={isActive}
                 onClick={() => setFilter(item)}
                 className={`rounded-full px-3.5 py-2 text-[11px] font-semibold transition ${
                   isActive
@@ -185,7 +150,7 @@ export default function TimelinePage() {
           <div className="mb-6 flex items-end justify-between gap-4">
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9A9196]">
-                {phase}
+                {filter === "All" ? "All loaded events" : filter}
               </p>
               <h2 className="mt-1 text-[17px] font-semibold tracking-[-0.02em] text-[#211C1F]">
                 Coordination in order

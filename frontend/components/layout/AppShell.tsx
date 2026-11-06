@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useEffect, useRef, useState } from "react";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
 import { useMaatruCareDemo } from "@/context/MaatruCareDemoContext";
@@ -11,16 +11,59 @@ interface AppShellProps {
 
 export default function AppShell({ children }: AppShellProps) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const mobileDrawerRef = useRef<HTMLElement | null>(null);
+  const menuButtonRef = useRef<HTMLButtonElement | null>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
   const { loading, error } = useMaatruCareDemo();
 
   useEffect(() => {
     if (!mobileNavOpen) return;
 
     const previousOverflow = document.body.style.overflow;
+    const menuButton = menuButtonRef.current;
+    returnFocusRef.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : menuButton;
     document.body.style.overflow = "hidden";
+    const drawer = mobileDrawerRef.current;
+
+    function getFocusableItems() {
+      return drawer?.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ) ?? [];
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setMobileNavOpen(false);
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const items = getFocusableItems();
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (!first || !last) {
+        event.preventDefault();
+      } else if (event.shiftKey && (document.activeElement === first || document.activeElement === drawer)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    const focusFrame = window.requestAnimationFrame(() => getFocusableItems()[0]?.focus());
+    document.addEventListener("keydown", handleKeyDown);
 
     return () => {
       document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", handleKeyDown);
+      window.cancelAnimationFrame(focusFrame);
+      window.requestAnimationFrame(() => {
+        (returnFocusRef.current ?? menuButton)?.focus();
+      });
     };
   }, [mobileNavOpen]);
 
@@ -29,11 +72,13 @@ export default function AppShell({ children }: AppShellProps) {
       <Sidebar
         mobileOpen={mobileNavOpen}
         onClose={() => setMobileNavOpen(false)}
+        mobileDrawerRef={mobileDrawerRef}
       />
 
       <Topbar
         onMenu={() => setMobileNavOpen((open) => !open)}
         mobileMenuOpen={mobileNavOpen}
+        menuButtonRef={menuButtonRef}
       />
 
       <main aria-busy={loading} className="ml-0 pt-[72px] lg:ml-[250px] lg:pt-[82px]">

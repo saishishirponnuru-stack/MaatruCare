@@ -9,6 +9,7 @@ ALLOWED_PERMISSIONS = {
 	"Coordination tasks",
 	"Care handoffs",
 	"Approved care updates",
+	"Lifestyle records",
 }
 
 

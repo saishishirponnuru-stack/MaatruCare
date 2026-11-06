@@ -5,7 +5,7 @@ from sqlalchemy import delete
 from .database import Base, SessionLocal, engine
 from .models import Appointment, AuditLog, CareHandoff, Caregiver, ConsentRecord, Patient, Permission, Task, TimelineEvent
 
-PERMISSIONS = ["Appointments", "Coordination tasks", "Care handoffs", "Approved care updates"]
+PERMISSIONS = ["Appointments", "Coordination tasks", "Care handoffs", "Approved care updates", "Lifestyle records"]
 
 
 def seed_database() -> None:
@@ -34,7 +34,7 @@ def seed_database() -> None:
 		db.add_all(caregivers)
 		db.flush()
 
-		permission_values = [[True, True, True, True], [True, True, False, True], [False, True, False, True]]
+		permission_values = [[True, True, True, True, True], [True, True, False, True, False], [False, True, False, True, False]]
 		for caregiver, enabled_values in zip(caregivers, permission_values):
 			db.add_all([Permission(caregiver_id=caregiver.id, permission_name=name, enabled=enabled, updated_at=datetime(2026, 9, 22, 10, 0)) for name, enabled in zip(PERMISSIONS, enabled_values)])
 

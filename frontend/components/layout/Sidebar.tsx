@@ -10,30 +10,35 @@ import {
   CheckSquare,
   ArrowLeftRight,
   ShieldCheck,
+  Activity,
   Settings,
   HeartPulse,
   X,
 } from "lucide-react";
 import { motion } from "framer-motion";
+import type { RefObject } from "react";
 
 const navigation = [
-  { label: "Home", href: "/dashboard", icon: Home },
-  { label: "Journey", href: "/journey", icon: Sprout },
-  { label: "Care Circle", href: "/care-circle", icon: UsersRound },
-  { label: "Timeline", href: "/timeline", icon: Clock3 },
-  { label: "Tasks", href: "/tasks", icon: CheckSquare },
-  { label: "Handoffs", href: "/handoffs", icon: ArrowLeftRight },
-  { label: "Consent", href: "/consent", icon: ShieldCheck },
+  { label: "Home", href: "/dashboard", icon: Home, iconColor: "text-[#356B53]", iconBg: "bg-[#EAF3ED]" },
+  { label: "Journey", href: "/journey", icon: Sprout, iconColor: "text-[#75658F]", iconBg: "bg-[#F0ECF7]" },
+  { label: "Care Circle", href: "/care-circle", icon: UsersRound, iconColor: "text-[#3C7E7B]", iconBg: "bg-[#E8F4F2]" },
+  { label: "Timeline", href: "/timeline", icon: Clock3, iconColor: "text-[#5E7485]", iconBg: "bg-[#EAF0F3]" },
+  { label: "Tasks", href: "/tasks", icon: CheckSquare, iconColor: "text-[#A16F32]", iconBg: "bg-[#FBF1DF]" },
+  { label: "Handoffs", href: "/handoffs", icon: ArrowLeftRight, iconColor: "text-[#5C62A1]", iconBg: "bg-[#ECECFA]" },
+  { label: "Consent", href: "/consent", icon: ShieldCheck, iconColor: "text-[#3D8061]", iconBg: "bg-[#E7F4EB]" },
+  { label: "Lifestyle", href: "/lifestyle", icon: Activity, iconColor: "text-[#3B86B5]", iconBg: "bg-[#E6F3FA]" },
 ];
 
 interface SidebarProps {
   mobileOpen?: boolean;
   onClose?: () => void;
+  mobileDrawerRef?: RefObject<HTMLElement | null>;
 }
 
 export default function Sidebar({
   mobileOpen = false,
   onClose = () => {},
+  mobileDrawerRef,
 }: SidebarProps) {
   const pathname = usePathname();
 
@@ -87,7 +92,7 @@ export default function Sidebar({
             const active = isActive(item.href);
 
             return (
-              <Link key={item.href} href={item.href} onClick={handleNavigate}>
+              <Link key={item.href} href={item.href} onClick={handleNavigate} aria-current={active ? "page" : undefined}>
                 <motion.div
                   whileHover={{ x: 2 }}
                   transition={{ duration: 0.15 }}
@@ -104,7 +109,7 @@ export default function Sidebar({
                     />
                   )}
 
-                  <Icon size={18} strokeWidth={active ? 2.3 : 1.9} />
+                  <span className={`flex h-7 w-7 items-center justify-center rounded-[9px] ${item.iconBg} ${item.iconColor}`}><Icon size={16} strokeWidth={active ? 2.3 : 1.9} aria-hidden="true" /></span>
                   <span>{item.label}</span>
                 </motion.div>
               </Link>
@@ -130,9 +135,9 @@ export default function Sidebar({
 
         <div className="mt-3 rounded-[14px] bg-[var(--mc-background)] p-3 lg:mt-4">
           <div className="flex items-center gap-2">
-            <div className="h-2 w-2 shrink-0 rounded-full bg-[#4F8068]" />
+            <div className="h-2 w-2 shrink-0 rounded-full bg-[#9A9196]" />
             <span className="text-[11px] font-medium text-[var(--mc-muted)]">
-              Your care space is private
+              Synthetic demo · no sign-in
             </span>
           </div>
         </div>
@@ -151,6 +156,8 @@ export default function Sidebar({
       <button
         type="button"
         aria-label="Close navigation overlay"
+        aria-hidden={!mobileOpen}
+        disabled={!mobileOpen}
         onClick={onClose}
         className={`fixed inset-0 z-40 bg-[#211C1F]/25 backdrop-blur-[2px] transition-opacity duration-200 lg:hidden ${
           mobileOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
@@ -159,7 +166,13 @@ export default function Sidebar({
 
       {/* Mobile drawer */}
       <aside
+        id="mobile-navigation"
+        ref={mobileDrawerRef}
+        role={mobileOpen ? "dialog" : undefined}
+        aria-modal={mobileOpen ? true : undefined}
         aria-label="Mobile navigation"
+        aria-hidden={!mobileOpen}
+        inert={!mobileOpen}
         className={`fixed left-0 top-0 z-50 flex h-[100dvh] w-[min(86vw,320px)] flex-col border-r border-[var(--mc-border)] bg-[var(--mc-surface)] shadow-[12px_0_40px_rgba(33,28,31,0.12)] transition-transform duration-250 ease-out lg:hidden ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}

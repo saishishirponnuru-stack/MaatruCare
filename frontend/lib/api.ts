@@ -79,6 +79,17 @@ export type ApiTimelineEvent = {
   created_at: string;
 };
 
+export type LifestyleData = {
+  water: Array<{ id: number; patient_id: number; log_date: string; status: string; quantity_ml: number | null; goal_ml: number | null; notes: string | null }>;
+  sleep: Array<{ id: number; patient_id: number; log_date: string; status: string; duration_hours: number | null; bedtime: string | null; wake_time: string | null; notes: string | null }>;
+  weight: Array<{ id: number; patient_id: number; entry_date: string; weight_kg: number; notes: string | null }>;
+  diet_recommendations: Array<{ id: number; patient_id: number; title: string; instructions: string; clinician_name: string | null; start_date: string; end_date: string | null; active: boolean }>;
+  diet_adherence: Array<{ id: number; recommendation_id: number; log_date: string; status: string; reason: string | null }>;
+  routines: Array<{ id: number; patient_id: number; name: string; activity_type: string; duration_minutes: number | null; advised_source: string | null; active: boolean }>;
+  activity_logs: Array<{ id: number; routine_id: number; log_date: string; completed: boolean; completion_status: string | null; actual_minutes: number | null; notes: string | null; missed_reason: string | null }>;
+  preferences: { id: number; patient_id: number; water_goal_ml: number | null; sleep_goal_minutes: number | null; updated_at: string };
+};
+
 export type ApiHandoffCreate = {
   patient_id: number;
   title: string;
@@ -194,4 +205,21 @@ export const api = {
   acknowledgeHandoff: (id: number, actorCaregiverId: number) => request<ApiHandoff>(`/api/handoffs/${id}/acknowledge`, { method: "POST", body: JSON.stringify({ actor_caregiver_id: actorCaregiverId }) }),
   completeHandoff: (id: number, actorCaregiverId: number) => request<ApiHandoff>(`/api/handoffs/${id}/complete`, { method: "POST", body: JSON.stringify({ actor_caregiver_id: actorCaregiverId }) }),
   updatePermission: (payload: ApiPermissionUpdate) => request<ApiPermission>("/api/permissions", { method: "PUT", body: JSON.stringify(payload) }),
+  getLifestyle: () => request<LifestyleData>(`/api/lifestyle?patient_id=${DEMO_PATIENT_ID}&actor_caregiver_id=${DEMO_ACTOR_CAREGIVER_ID}`),
+  createWater: (payload: Record<string, unknown>) => request("/api/lifestyle/water", { method: "POST", body: JSON.stringify(payload) }),
+  updateWater: (id: number, payload: Record<string, unknown>) => request(`/api/lifestyle/water/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
+  deleteWater: (id: number) => request(`/api/lifestyle/water/${id}?actor_caregiver_id=${DEMO_ACTOR_CAREGIVER_ID}`, { method: "DELETE" }),
+  updateLifestylePreferences: (payload: Record<string, unknown>) => request("/api/lifestyle/preferences", { method: "PUT", body: JSON.stringify(payload) }),
+  createSleep: (payload: Record<string, unknown>) => request("/api/lifestyle/sleep", { method: "POST", body: JSON.stringify(payload) }),
+  updateSleep: (id: number, payload: Record<string, unknown>) => request(`/api/lifestyle/sleep/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
+  createWeight: (payload: Record<string, unknown>) => request("/api/lifestyle/weight", { method: "POST", body: JSON.stringify(payload) }),
+  updateWeight: (id: number, payload: Record<string, unknown>) => request(`/api/lifestyle/weight/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
+  createDietRecommendation: (payload: Record<string, unknown>) => request("/api/lifestyle/diet/recommendations", { method: "POST", body: JSON.stringify(payload) }),
+  updateDietRecommendation: (id: number, payload: Record<string, unknown>) => request(`/api/lifestyle/diet/recommendations/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
+  createRoutine: (payload: Record<string, unknown>) => request("/api/lifestyle/activities/routines", { method: "POST", body: JSON.stringify(payload) }),
+  updateRoutine: (id: number, payload: Record<string, unknown>) => request(`/api/lifestyle/activities/routines/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
+  createDietAdherence: (id: number, payload: Record<string, unknown>) => request(`/api/lifestyle/diet/recommendations/${id}/adherence`, { method: "POST", body: JSON.stringify(payload) }),
+  updateDietAdherence: (id: number, payload: Record<string, unknown>) => request(`/api/lifestyle/diet/adherence/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
+  createActivityLog: (id: number, payload: Record<string, unknown>) => request(`/api/lifestyle/activities/routines/${id}/logs`, { method: "POST", body: JSON.stringify(payload) }),
+  updateActivityLog: (id: number, payload: Record<string, unknown>) => request(`/api/lifestyle/activities/logs/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
 };

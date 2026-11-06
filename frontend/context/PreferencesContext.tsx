@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { MotionConfig } from "framer-motion";
 
 export type ThemeMode = "light" | "dark";
 
@@ -51,6 +52,9 @@ export function PreferencesProvider({
   useEffect(() => {
     try {
       const stored = window.localStorage.getItem(STORAGE_KEY);
+      const systemReducedMotion = window.matchMedia?.(
+        "(prefers-reduced-motion: reduce)",
+      ).matches ?? false;
 
       if (stored) {
         const parsed: unknown = JSON.parse(stored);
@@ -73,9 +77,12 @@ export function PreferencesProvider({
             reducedMotion:
               typeof value.reducedMotion === "boolean"
                 ? value.reducedMotion
-                : defaults.reducedMotion,
+                : systemReducedMotion,
           });
-        }
+      } else {
+        // Use the operating-system accessibility preference until the user chooses otherwise.
+        setPreferences({ ...defaults, reducedMotion: systemReducedMotion });
+      }
       }
     } catch {
       // Continue with defaults if stored preferences are unavailable.
@@ -154,7 +161,9 @@ export function PreferencesProvider({
         setReducedMotion,
       }}
     >
-      {children}
+      <MotionConfig reducedMotion={preferences.reducedMotion ? "always" : "never"}>
+        {children}
+      </MotionConfig>
     </PreferencesContext.Provider>
   );
 }

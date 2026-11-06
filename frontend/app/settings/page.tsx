@@ -2,17 +2,13 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { useState } from "react";
-import { usePreferences } from "@/context/PreferencesContext";
 import {
   Accessibility,
   Bell,
-  Check,
   ChevronRight,
   Eye,
   FileText,
   Globe2,
-  KeyRound,
   LockKeyhole,
   Mail,
   MessageCircle,
@@ -21,54 +17,42 @@ import {
   SlidersHorizontal,
   UserRound,
   UserRoundPen,
-  Volume2,
 } from "lucide-react";
 import AppShell from "@/components/layout/AppShell";
+import { useLocalSettings, type CarePreferences, type NotificationPreferences } from "@/context/LocalSettingsContext";
+import { usePreferences } from "@/context/PreferencesContext";
 
-const initialNotifications = {
-  appointmentReminders: true,
-  taskReminders: true,
-  handoffNotifications: true,
-  careCircleActivity: false,
-};
-
-type NotificationKey = keyof typeof initialNotifications;
+type NotificationKey = keyof NotificationPreferences;
+type CarePreferenceKey = keyof CarePreferences;
 
 const notificationItems: Array<{
   key: NotificationKey;
   title: string;
   description: string;
 }> = [
-  {
-    key: "appointmentReminders",
-    title: "Appointment reminders",
-    description: "A gentle reminder before an upcoming visit.",
-  },
-  {
-    key: "taskReminders",
-    title: "Task reminders",
-    description: "Stay on top of shared coordination responsibilities.",
-  },
-  {
-    key: "handoffNotifications",
-    title: "Care handoff notifications",
-    description: "Know when a caregiver sends or acknowledges a handoff.",
-  },
-  {
-    key: "careCircleActivity",
-    title: "Care Circle activity",
-    description: "See updates from the people you have approved.",
-  },
+  { key: "appointmentReminders", title: "Appointment reminders", description: "Preference for a future reminder before a visit." },
+  { key: "taskReminders", title: "Task reminders", description: "Preference for future coordination reminders." },
+  { key: "handoffNotifications", title: "Care handoff updates", description: "Preference for future handoff status updates." },
+  { key: "careCircleActivity", title: "Care Circle activity", description: "Preference for future activity updates." },
 ];
 
-const preferenceOptions = ["Email", "Text message", "Email and text message"];
+const carePreferenceItems: Array<{
+  key: CarePreferenceKey;
+  label: string;
+  options: readonly string[];
+}> = [
+  { key: "preferredLanguage", label: "Preferred language for future coordination", options: ["English", "Hindi", "Tamil"] },
+  { key: "communicationPreference", label: "Preferred communication channel", options: ["Email", "Text message", "Email and text message"] },
+  { key: "caregiverUpdates", label: "Caregiver update preference", options: ["Only approved updates", "All coordination updates", "No caregiver updates"] },
+  { key: "appointmentReminders", label: "Appointment reminder preference", options: ["One day before", "Two days before", "One week before"] },
+];
+
+function initials(name: string) {
+  return name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase() ?? "").join("") || "MC";
+}
 
 export default function SettingsPage() {
-  const [notifications, setNotifications] = useState(initialNotifications);
-  const [preferredLanguage, setPreferredLanguage] = useState("English");
-  const [communicationPreference, setCommunicationPreference] = useState("Email and text message");
-  const [caregiverUpdates, setCaregiverUpdates] = useState("Only approved updates");
-  const [appointmentReminders, setAppointmentReminders] = useState("One day before");
+  const { profile, carePreferences, notifications, updateCarePreference, toggleNotification } = useLocalSettings();
   const {
     theme,
     toggleTheme,
@@ -79,154 +63,100 @@ export default function SettingsPage() {
     reducedMotion,
     setReducedMotion,
   } = usePreferences();
-  const [feedback, setFeedback] = useState("");
 
-  function showFeedback(message: string) {
-    setFeedback(message);
-    window.setTimeout(() => setFeedback(""), 2600);
+  function setCarePreference(key: CarePreferenceKey, value: string) {
+    updateCarePreference(key, value as CarePreferences[typeof key]);
   }
-
-  function toggleNotification(key: NotificationKey) {
-    setNotifications((current) => ({ ...current, [key]: !current[key] }));
-  }
-
-  const pageClassName = "transition-colors";
 
   return (
     <AppShell>
-      <div className={pageClassName}>
-        <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9A9196]">
-              Patient control
-            </p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-[-0.03em] text-[#211C1F]">
-              Settings
-            </h1>
-            <p className="mt-2 max-w-xl text-sm leading-6 text-[#756D72]">
-              Shape how MaatruCare supports your coordination space.
-            </p>
-          </div>
-
-          {feedback && (
-            <motion.div
-              initial={reducedMotion ? false : { opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex items-center gap-2 self-start rounded-[12px] border border-[#CFE0D5] bg-[#F1F8F3] px-3 py-2 text-xs font-medium text-[#3F6D56] sm:self-auto"
-              role="status"
-            >
-              <Check size={15} />
-              {feedback}
-            </motion.div>
-          )}
+      <div className="transition-colors">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9A9196]">Local demo preferences</p>
+          <h1 className="mt-2 text-3xl font-semibold tracking-[-0.03em] text-[#211C1F]">Settings</h1>
+          <p className="mt-2 max-w-xl text-sm leading-6 text-[#756D72]">Choose how this browser displays the MaatruCare demo. These settings do not create an account or change backend access.</p>
         </div>
 
         <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(340px,0.8fr)]">
           <div className="space-y-6">
-            <SettingsSection reducedMotion={reducedMotion} eyebrow="Profile" title="Your profile" icon={<UserRound size={17} />}>
+            <SettingsSection reducedMotion={reducedMotion} eyebrow="Sample profile" title="Local display profile" icon={<UserRound size={17} />}>
               <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="flex h-16 w-16 items-center justify-center rounded-[18px] bg-[#E8D7E0] text-lg font-semibold text-[#6D3A5B]">
-                    AR
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-semibold text-[#211C1F]">Ananya Rao</h2>
-                    <p className="mt-1 text-xs text-[#9A9196]">Patient</p>
+                <div className="flex min-w-0 items-center gap-4">
+                  <div aria-hidden="true" className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[18px] bg-[#E8D7E0] text-lg font-semibold text-[#6D3A5B]">{initials(profile.name)}</div>
+                  <div className="min-w-0">
+                    <h2 className="truncate text-lg font-semibold text-[#211C1F]">{profile.name}</h2>
+                    <p className="mt-1 text-xs text-[#9A9196]">Synthetic patient profile · stored in this browser only</p>
                   </div>
                 </div>
-                <ActionButton icon={<UserRoundPen size={15} />} onClick={() => showFeedback("Profile editing is ready for your updates.")}>
-                  Edit profile
-                </ActionButton>
+                <Link href="/profile" className="flex h-10 shrink-0 items-center justify-center gap-2 rounded-[11px] border border-[#DCCBD5] bg-white px-3 text-xs font-semibold text-[#6D3A5B] transition hover:border-[#B86B87] hover:bg-[#FBF8F7]"><UserRoundPen size={15} />Edit profile</Link>
               </div>
-
               <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                <InfoItem icon={<Phone size={15} />} label="Phone" value="+91 90000 00001" />
-                <InfoItem icon={<Mail size={15} />} label="Email" value="ananya.rao@example.test" />
-                <InfoItem icon={<Globe2 size={15} />} label="Preferred language" value={preferredLanguage} />
+                <InfoItem icon={<Phone size={15} />} label="Phone" value={profile.phone} />
+                <InfoItem icon={<Mail size={15} />} label="Email" value={profile.email} />
+                <InfoItem icon={<Globe2 size={15} />} label="Preferred language" value={carePreferences.preferredLanguage} />
               </div>
+              <p className="mt-4 rounded-[12px] bg-[#FBF8F7] p-3 text-[11px] leading-5 text-[#756D72]">This sample has no authenticated account or backend profile. Do not enter real patient, caregiver, or contact details.</p>
             </SettingsSection>
 
-            <SettingsSection reducedMotion={reducedMotion} eyebrow="Care preferences" title="How care coordination reaches you" icon={<SlidersHorizontal size={17} />}>
+            <SettingsSection reducedMotion={reducedMotion} eyebrow="Care preferences" title="Future coordination preferences" icon={<SlidersHorizontal size={17} />}>
+              <p className="mb-5 rounded-[12px] bg-[#FBF8F7] p-3 text-[11px] leading-5 text-[#756D72]">Selections are saved locally for demonstration. The interface remains in English; these choices do not send messages, schedule reminders, or change sharing permissions.</p>
               <div className="grid gap-x-5 gap-y-5 sm:grid-cols-2">
-                <SelectField label="Preferred language" value={preferredLanguage} onChange={setPreferredLanguage} options={["English", "Hindi", "Tamil"]} />
-                <SelectField label="Communication preference" value={communicationPreference} onChange={setCommunicationPreference} options={preferenceOptions} />
-                <SelectField label="Caregiver update preference" value={caregiverUpdates} onChange={setCaregiverUpdates} options={["Only approved updates", "All coordination updates", "No caregiver updates"]} />
-                <SelectField label="Appointment reminder preference" value={appointmentReminders} onChange={setAppointmentReminders} options={["One day before", "Two days before", "One week before"]} />
+                {carePreferenceItems.map((item) => (
+                  <SelectField key={item.key} label={item.label} value={carePreferences[item.key]} onChange={(value) => setCarePreference(item.key, value)} options={item.options} />
+                ))}
               </div>
             </SettingsSection>
 
-            <SettingsSection reducedMotion={reducedMotion} eyebrow="Notifications" title="Choose what you hear about" icon={<Bell size={17} />}>
+            <SettingsSection reducedMotion={reducedMotion} eyebrow="Notifications" title="Local notification preferences" icon={<Bell size={17} />}>
+              <p className="mb-5 rounded-[12px] bg-[#FBF8F7] p-3 text-[11px] leading-5 text-[#756D72]">These switches persist in this browser only. This demo does not send email, SMS, push notifications, or reminder alerts.</p>
               <div className="divide-y divide-[#EFE8EB]">
                 {notificationItems.map((item) => (
-                  <ToggleRow
-                    key={item.key}
-                    title={item.title}
-                    description={item.description}
-                    enabled={notifications[item.key]}
-                    onToggle={() => toggleNotification(item.key)}
-                  />
+                  <ToggleRow key={item.key} title={item.title} description={item.description} enabled={notifications[item.key]} onToggle={() => toggleNotification(item.key)} />
                 ))}
               </div>
             </SettingsSection>
           </div>
 
           <div className="space-y-6">
-            <SettingsSection reducedMotion={reducedMotion} eyebrow="Privacy & patient control" title="Your information stays yours" icon={<ShieldCheck size={17} />} tone="rose">
+            <SettingsSection reducedMotion={reducedMotion} eyebrow="Privacy & patient control" title="Demo access boundaries" icon={<ShieldCheck size={17} />} tone="rose">
               <div className="flex gap-3 rounded-[14px] bg-[#FBF8F7] p-4">
                 <LockKeyhole size={18} className="mt-0.5 shrink-0 text-[#6D3A5B]" />
-                <p className="text-xs leading-5 text-[#756D72]">
-                  Approved information is shared only with authorized Care Circle members. MaatruCare supports coordination and does not make medical decisions.
-                </p>
+                <p className="text-xs leading-5 text-[#756D72]">This demo uses synthetic records and a fixed demo actor; it has no sign-in or production patient account. Server permission checks remain enabled for protected coordination data. Use fictional data only.</p>
               </div>
               <div className="mt-4 space-y-2">
-                <LinkRow href="/consent" icon={<Eye size={16} />} title="Manage consent and sharing" description="Review who can see approved care information." />
-                <LinkRow href="/timeline" icon={<FileText size={16} />} title="View activity history" description="See the coordination timeline and recorded updates." />
+                <LinkRow href="/consent" icon={<Eye size={16} />} title="Review sharing permissions" description="Change individual permission categories where the backend supports it." />
+                <LinkRow href="/timeline" icon={<FileText size={16} />} title="View activity timeline" description="Review coordination events returned by the backend." />
               </div>
             </SettingsSection>
 
-            <SettingsSection reducedMotion={reducedMotion} eyebrow="Accessibility" title="Make your space easier to use" icon={<Accessibility size={17} />}>
+            <SettingsSection reducedMotion={reducedMotion} eyebrow="Accessibility" title="Display and motion" icon={<Accessibility size={17} />}>
               <div className="divide-y divide-[#EFE8EB]">
                 <ToggleRow title="Dark mode" description="Use a darker appearance across the application." enabled={theme === "dark"} onToggle={toggleTheme} />
-                <ToggleRow title="Larger text" description="Increase the reading size across the application." enabled={largerText} onToggle={() => setLargerText(!largerText)} />
-                <ToggleRow title="High contrast" description="Use stronger text contrast for easier scanning." enabled={highContrast} onToggle={() => setHighContrast(!highContrast)} />
-                <ToggleRow title="Reduced motion" description="Use fewer movement effects while navigating." enabled={reducedMotion} onToggle={() => setReducedMotion(!reducedMotion)} />
+                <ToggleRow title="Larger text" description="Increase text size across application content." enabled={largerText} onToggle={() => setLargerText(!largerText)} />
+                <ToggleRow title="High contrast" description="Strengthen text, border, and focus contrast." enabled={highContrast} onToggle={() => setHighContrast(!highContrast)} />
+                <ToggleRow title="Reduced motion" description="Reduce movement effects throughout the application." enabled={reducedMotion} onToggle={() => setReducedMotion(!reducedMotion)} />
               </div>
             </SettingsSection>
 
-            <SettingsSection reducedMotion={reducedMotion} eyebrow="Account" title="Account controls" icon={<KeyRound size={17} />}>
-              <div className="space-y-2">
-                <AccountAction icon={<KeyRound size={16} />} label="Change password" onClick={() => showFeedback("Password change flow opened.")} />
-                <AccountAction icon={<UserRound size={16} />} label="Sign out" onClick={() => showFeedback("You are still signed in to this demo space.")} />
-                <AccountAction icon={<MessageCircle size={16} />} label="Delete account" danger onClick={() => showFeedback("Account deletion requires confirmation.")} />
+            <SettingsSection reducedMotion={reducedMotion} eyebrow="Account" title="Account actions unavailable" icon={<MessageCircle size={17} />}>
+              <div className="flex items-start gap-3 rounded-[14px] bg-[#FBF8F7] p-4">
+                <LockKeyhole size={17} className="mt-0.5 shrink-0 text-[#6D3A5B]" />
+                <p className="text-xs leading-5 text-[#756D72]">This prototype has no account authentication or account-management API. Password changes, sign-out, and account deletion are not available here.</p>
               </div>
             </SettingsSection>
           </div>
         </div>
 
         <div className="mt-8 flex items-center gap-2 border-t border-[#E9E1E4] pt-5 text-[11px] text-[#9A9196]">
-          <Volume2 size={14} />
-          Your settings apply to this private coordination space.
+          <MessageCircle size={14} />
+          Local preferences are saved in this browser and are not sent to the backend.
         </div>
       </div>
     </AppShell>
   );
 }
 
-function SettingsSection({
-  reducedMotion,
-  eyebrow,
-  title,
-  icon,
-  children,
-  tone = "white",
-}: {
-  reducedMotion: boolean;
-  eyebrow: string;
-  title: string;
-  icon: React.ReactNode;
-  children: React.ReactNode;
-  tone?: "white" | "rose";
-}) {
+function SettingsSection({ reducedMotion, eyebrow, title, icon, children, tone = "white" }: { reducedMotion: boolean; eyebrow: string; title: string; icon: React.ReactNode; children: React.ReactNode; tone?: "white" | "rose" }) {
   return (
     <motion.section
       initial={reducedMotion ? false : { opacity: 0, y: 8 }}
@@ -236,10 +166,7 @@ function SettingsSection({
     >
       <div className="flex items-start gap-3">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px] bg-[#F3EAF0] text-[#6D3A5B]">{icon}</div>
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9A9196]">{eyebrow}</p>
-          <h2 className="mt-1 text-[17px] font-semibold tracking-[-0.02em] text-[#211C1F]">{title}</h2>
-        </div>
+        <div><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9A9196]">{eyebrow}</p><h2 className="mt-1 text-[17px] font-semibold tracking-[-0.02em] text-[#211C1F]">{title}</h2></div>
       </div>
       <div className="mt-5">{children}</div>
     </motion.section>
@@ -247,47 +174,19 @@ function SettingsSection({
 }
 
 function InfoItem({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
-  return (
-    <div className="rounded-[14px] border border-[#EFE8EB] bg-[#FBF8F7] p-3">
-      <div className="flex items-center gap-2 text-[#9A9196]">{icon}<span className="text-[10px] font-semibold uppercase tracking-[0.1em]">{label}</span></div>
-      <p className="mt-2 truncate text-xs font-medium text-[#211C1F]">{value}</p>
-    </div>
-  );
+  return <div className="min-w-0 rounded-[14px] border border-[#EFE8EB] bg-[#FBF8F7] p-3"><div className="flex items-center gap-2 text-[#9A9196]">{icon}<span className="text-[10px] font-semibold uppercase tracking-[0.1em]">{label}</span></div><p className="mt-2 truncate text-xs font-medium text-[#211C1F]">{value}</p></div>;
 }
 
-function SelectField({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: string[] }) {
-  return (
-    <label className="block">
-      <span className="mb-2 block text-xs font-semibold text-[#756D72]">{label}</span>
-      <select value={value} onChange={(event) => onChange(event.target.value)} className="h-11 w-full rounded-[11px] border border-[#E9E1E4] bg-[#FBF8F7] px-3 text-xs font-medium text-[#211C1F] outline-none transition focus:border-[#B86B87] focus:ring-2 focus:ring-[#EBDCE5]">
-        {options.map((option) => <option key={option}>{option}</option>)}
-      </select>
-    </label>
-  );
+function SelectField({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: readonly string[] }) {
+  const id = `preference-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+  return <label htmlFor={id} className="block"><span className="mb-2 block text-xs font-semibold text-[#756D72]">{label}</span><select id={id} value={value} onChange={(event) => onChange(event.target.value)} className="h-11 w-full rounded-[11px] border border-[#E9E1E4] bg-[#FBF8F7] px-3 text-xs font-medium text-[#211C1F] outline-none transition focus:border-[#B86B87] focus:ring-2 focus:ring-[#EBDCE5]">{options.map((option) => <option key={option}>{option}</option>)}</select></label>;
 }
 
 function ToggleRow({ title, description, enabled, onToggle }: { title: string; description: string; enabled: boolean; onToggle: () => void }) {
-  return (
-    <div className="flex items-center justify-between gap-4 py-4 first:pt-0 last:pb-0">
-      <div>
-        <p className="text-sm font-semibold text-[#211C1F]">{title}</p>
-        <p className="mt-1 text-xs leading-5 text-[#9A9196]">{description}</p>
-      </div>
-      <button type="button" role="switch" aria-checked={enabled} aria-label={`${title}: ${enabled ? "on" : "off"}`} onClick={onToggle} className={`relative h-7 w-12 shrink-0 rounded-full p-1 transition-colors ${enabled ? "bg-[#6D3A5B]" : "bg-[#D9D1D5]"}`}>
-        <span className={`block h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${enabled ? "translate-x-5" : "translate-x-0"}`} />
-      </button>
-    </div>
-  );
-}
-
-function ActionButton({ icon, children, onClick }: { icon: React.ReactNode; children: React.ReactNode; onClick: () => void }) {
-  return <button type="button" onClick={onClick} className="flex h-10 items-center justify-center gap-2 rounded-[11px] border border-[#DCCBD5] bg-white px-3 text-xs font-semibold text-[#6D3A5B] transition hover:border-[#B86B87] hover:bg-[#FBF8F7] active:scale-[0.98]">{icon}{children}</button>;
+  const id = `setting-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+  return <div className="flex items-center justify-between gap-4 py-4 first:pt-0 last:pb-0"><div className="min-w-0"><p id={`${id}-label`} className="text-sm font-semibold text-[#211C1F]">{title}</p><p id={`${id}-description`} className="mt-1 text-xs leading-5 text-[#9A9196]">{description}</p></div><button type="button" role="switch" aria-checked={enabled} aria-labelledby={`${id}-label`} aria-describedby={`${id}-description`} onClick={onToggle} className={`relative h-7 w-12 shrink-0 rounded-full p-1 transition-colors ${enabled ? "bg-[#6D3A5B]" : "bg-[#D9D1D5]"}`}><span aria-hidden="true" className={`block h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${enabled ? "translate-x-5" : "translate-x-0"}`} /></button></div>;
 }
 
 function LinkRow({ href, icon, title, description }: { href: string; icon: React.ReactNode; title: string; description: string }) {
   return <Link href={href} className="flex items-center gap-3 rounded-[13px] p-3 transition hover:bg-white"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-white text-[#6D3A5B]">{icon}</span><span className="min-w-0 flex-1"><span className="block text-xs font-semibold text-[#211C1F]">{title}</span><span className="mt-1 block text-[11px] leading-4 text-[#9A9196]">{description}</span></span><ChevronRight size={15} className="shrink-0 text-[#9A9196]" /></Link>;
-}
-
-function AccountAction({ icon, label, onClick, danger = false }: { icon: React.ReactNode; label: string; onClick: () => void; danger?: boolean }) {
-  return <button type="button" onClick={onClick} className={`flex w-full items-center gap-3 rounded-[12px] px-3 py-3 text-left text-xs font-semibold transition hover:bg-[#FBF8F7] active:scale-[0.99] ${danger ? "text-[#B85C62]" : "text-[#6D3A5B]"}`}><span className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-[#FBF8F7]">{icon}</span>{label}<ChevronRight size={15} className="ml-auto text-[#9A9196]" /></button>;
 }

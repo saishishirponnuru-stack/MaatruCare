@@ -14,7 +14,6 @@ import {
   ShieldCheck,
   UserRound,
   Users,
-  X,
 } from "lucide-react";
 import { useMaatruCareDemo } from "@/context/MaatruCareDemoContext";
 
@@ -27,14 +26,12 @@ const permissionKeys = [
 
 type PermissionKey = (typeof permissionKeys)[number];
 type CaregiverName = "Rahul Rao" | "Lakshmi Rao" | "Priya Rao";
-type AccessStatus = "Active" | "Revoked";
 
 type Caregiver = {
   name: CaregiverName;
   relation: string;
   role: string;
   initials: string;
-  lastUpdate: string;
 };
 
 const caregivers: Caregiver[] = [
@@ -43,21 +40,18 @@ const caregivers: Caregiver[] = [
     relation: "Partner",
     role: "Primary caregiver",
     initials: "RR",
-    lastUpdate: "Updated 24 Sep",
   },
   {
     name: "Lakshmi Rao",
     relation: "Mother",
     role: "Family caregiver",
     initials: "LR",
-    lastUpdate: "Updated 26 Sep",
   },
   {
     name: "Priya Rao",
     relation: "Sister",
     role: "Support caregiver",
     initials: "PR",
-    lastUpdate: "Updated 22 Sep",
   },
 ];
 
@@ -69,12 +63,6 @@ const permissionDescriptions: Record<PermissionKey, string> = {
     "Approved coordination context transferred between caregivers.",
   "Approved care updates":
     "Information explicitly reviewed and approved for Care Circle sharing.",
-};
-
-const initialStatuses: Record<CaregiverName, AccessStatus> = {
-  "Rahul Rao": "Active",
-  "Lakshmi Rao": "Active",
-  "Priya Rao": "Active",
 };
 
 const accessHistory = [
@@ -99,20 +87,14 @@ export default function ConsentPage() {
   const { permissions, updateConsentPermission } = useMaatruCareDemo();
   const [selectedCaregiver, setSelectedCaregiver] =
     useState<CaregiverName>("Rahul Rao");
-  const [statuses] =
-    useState<Record<CaregiverName, AccessStatus>>(initialStatuses);
   const [feedback, setFeedback] = useState("");
   const [pendingPermission, setPendingPermission] =
     useState<PermissionKey | null>(null);
 
   const summary = useMemo(() => {
-    const activeCaregivers = caregivers.filter(
-      (caregiver) => statuses[caregiver.name] === "Active",
-    );
-
     return {
       members: caregivers.length,
-      approved: activeCaregivers.reduce(
+      approved: caregivers.reduce(
         (total, caregiver) =>
           total +
           permissionKeys.filter(
@@ -120,25 +102,21 @@ export default function ConsentPage() {
           ).length,
         0,
       ),
-      limited: activeCaregivers.filter(
+      limited: caregivers.filter(
         (caregiver) =>
           permissionKeys.some(
             (permission) => !permissions[caregiver.name][permission],
           ),
       ).length,
-      revoked: caregivers.filter(
-        (caregiver) => statuses[caregiver.name] === "Revoked",
-      ).length,
     };
-  }, [permissions, statuses]);
+  }, [permissions]);
 
-  const selectedIsRevoked = statuses[selectedCaregiver] === "Revoked";
   const selectedPermissionCount = permissionKeys.filter(
     (permission) => permissions[selectedCaregiver][permission],
   ).length;
 
   async function togglePermission(permission: PermissionKey) {
-    if (selectedIsRevoked || pendingPermission !== null) return;
+    if (pendingPermission !== null) return;
     setPendingPermission(permission);
     try {
       await updateConsentPermission(selectedCaregiver, permission, !permissions[selectedCaregiver][permission]);
@@ -148,10 +126,6 @@ export default function ConsentPage() {
     } finally {
       setPendingPermission(null);
     }
-  }
-
-  function revokeSelectedAccess() {
-    setFeedback("Full caregiver revocation is not available in the current backend. Revoke individual permissions instead.");
   }
 
   return (
@@ -168,7 +142,7 @@ export default function ConsentPage() {
             </h1>
 
             <p className="mt-2 max-w-xl text-sm leading-6 text-[#756D72]">
-              You control what your Care Circle can see.
+              Review the configured demo caregivers and their backend-enforced permission categories.
             </p>
           </div>
         </div>
@@ -183,30 +157,27 @@ export default function ConsentPage() {
           </div>
 
           <p className="self-center max-w-3xl text-xs leading-5 text-[#756D72]">
-            Your information stays under your control. You can review, change
-            or revoke sharing permissions at any time.
+            Individual permission switches write to the backend and remain subject to server authorization. Full caregiver removal is not supported here; turn off each relevant category and verify the response rather than assuming access has been revoked.
           </p>
         </motion.div>
         {feedback && <div className="mt-5 rounded-[12px] border border-[#E4D7DF] bg-white px-3 py-2 text-xs font-medium text-[#6D3A5B]">{feedback}</div>}
 
         <section className="mt-8">
-          <SectionHeading eyebrow="Sharing overview" title="Your sharing at a glance" />
+          <SectionHeading eyebrow="Sharing overview" title="Configured demo permissions" />
 
-          <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             <SummaryCard icon={<Users size={17} />} label="Care Circle members" value={summary.members} />
             <SummaryCard icon={<CheckCircle2 size={17} />} label="Approved access" value={summary.approved} />
             <SummaryCard icon={<EyeOff size={17} />} label="Limited access" value={summary.limited} />
-            <SummaryCard icon={<X size={17} />} label="Revoked access" value={summary.revoked} />
           </div>
         </section>
 
         <section className="mt-8">
-          <SectionHeading eyebrow="Care Circle access" title="People you have chosen to share with" />
+          <SectionHeading eyebrow="Synthetic directory" title="Example caregiver profiles" />
 
           <div className="mt-4 grid gap-4 lg:grid-cols-3">
             {caregivers.map((caregiver, index) => {
               const isSelected = caregiver.name === selectedCaregiver;
-              const isRevoked = statuses[caregiver.name] === "Revoked";
               const permissionCount = permissionKeys.filter(
                 (permission) => permissions[caregiver.name][permission],
               ).length;
@@ -240,15 +211,12 @@ export default function ConsentPage() {
                   </div>
 
                   <div className="mt-5 flex items-center justify-between border-t border-[#F0E9EC] pt-4">
-                    <span className={`flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[9px] font-semibold ${isRevoked ? "bg-[#FBEDEE] text-[#B85C62]" : "bg-[#EEF5F0] text-[#4F8068]"}`}>
-                      <span className={`h-1.5 w-1.5 rounded-full ${isRevoked ? "bg-[#B85C62]" : "bg-[#4F8068]"}`} />
-                      {isRevoked ? "Revoked" : "Active"}
-                    </span>
+                    <span className="rounded-full bg-[#F3EAF0] px-2.5 py-1.5 text-[9px] font-semibold text-[#6D3A5B]">Sample profile</span>
                     <span className="text-[10px] font-medium text-[#756D72]">{permissionCount}/4 approved</span>
                   </div>
 
                   <p className="mt-3 flex items-center gap-1.5 text-[10px] text-[#9A9196]">
-                    <Clock3 size={12} /> {caregiver.lastUpdate}
+                    <Clock3 size={12} /> No live caregiver status is shown
                   </p>
                 </motion.button>
               );
@@ -266,9 +234,7 @@ export default function ConsentPage() {
                 </p>
               </div>
 
-              <span className={`w-fit rounded-full px-3 py-1.5 text-[10px] font-semibold ${selectedIsRevoked ? "bg-[#FBEDEE] text-[#B85C62]" : "bg-[#F3EAF0] text-[#6D3A5B]"}`}>
-                {selectedIsRevoked ? "Access revoked" : `${selectedPermissionCount} of 4 approved`}
-              </span>
+              <span className="w-fit rounded-full bg-[#F3EAF0] px-3 py-1.5 text-[10px] font-semibold text-[#6D3A5B]">{selectedPermissionCount} of 4 approved</span>
             </div>
           </div>
 
@@ -278,8 +244,8 @@ export default function ConsentPage() {
 
               return (
                 <div key={permission} className="flex items-center gap-4 px-6 py-4">
-                  <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] ${enabled && !selectedIsRevoked ? "bg-[#EEF5F0] text-[#4F8068]" : "bg-[#F7F3F5] text-[#9A9196]"}`}>
-                    {enabled && !selectedIsRevoked ? <Eye size={16} /> : <EyeOff size={16} />}
+                  <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] ${enabled ? "bg-[#EEF5F0] text-[#4F8068]" : "bg-[#F7F3F5] text-[#9A9196]"}`}>
+                    {enabled ? <Eye size={16} /> : <EyeOff size={16} />}
                   </div>
 
                   <div className="min-w-0 flex-1">
@@ -289,14 +255,14 @@ export default function ConsentPage() {
 
                   <button
                     role="switch"
-                    aria-checked={enabled && !selectedIsRevoked}
+                    aria-checked={enabled}
                     aria-label={`${permission} for ${selectedCaregiver}`}
                     aria-busy={pendingPermission === permission}
-                    disabled={selectedIsRevoked || pendingPermission !== null}
+                    disabled={pendingPermission !== null}
                     onClick={() => togglePermission(permission)}
-                    className={`relative h-7 w-12 shrink-0 rounded-full p-1 transition disabled:cursor-wait disabled:opacity-60 ${enabled && !selectedIsRevoked ? "bg-[#6D3A5B]" : "bg-[#DCD3D7]"} ${selectedIsRevoked ? "cursor-not-allowed opacity-60" : ""}`}
+                    className={`relative h-7 w-12 shrink-0 rounded-full p-1 transition disabled:cursor-wait disabled:opacity-60 ${enabled ? "bg-[#6D3A5B]" : "bg-[#DCD3D7]"}`}
                   >
-                    <span className={`block h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${enabled && !selectedIsRevoked ? "translate-x-5" : "translate-x-0"}`} />
+                    <span className={`block h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${enabled ? "translate-x-5" : "translate-x-0"}`} />
                   </button>
                 </div>
               );
@@ -331,7 +297,7 @@ export default function ConsentPage() {
               <h2 className="text-sm font-semibold text-[#211C1F]">Need to change access?</h2>
             </div>
 
-            <p className="mt-3 text-[11px] leading-5 text-[#756D72]">You can update or revoke a caregiver&apos;s access at any time.</p>
+            <p className="mt-3 text-[11px] leading-5 text-[#756D72]">You can turn individual permission categories off using the switches above. The current backend does not support a single full-caregiver revocation action.</p>
 
             <div className="mt-5 space-y-2">
               <Link href="/care-circle" className="flex items-center justify-center gap-2 rounded-[13px] bg-[#6D3A5B] px-4 py-3 text-xs font-semibold text-white transition hover:bg-[#4D2941]">
@@ -339,14 +305,9 @@ export default function ConsentPage() {
                 <ChevronRight size={15} />
               </Link>
 
-              <button
-                onClick={revokeSelectedAccess}
-                disabled={selectedIsRevoked}
-                className="flex w-full items-center justify-center gap-2 rounded-[13px] border border-[#E9E1E4] bg-white px-4 py-3 text-xs font-semibold text-[#B85C62] transition hover:bg-[#FBEDEE] disabled:cursor-default disabled:border-[#E9E1E4] disabled:text-[#9A9196]"
-              >
-                <X size={15} />
-                {selectedIsRevoked ? `${selectedCaregiver} access revoked` : `Revoke ${selectedCaregiver} access`}
-              </button>
+              <div role="note" className="rounded-[13px] border border-[#E9E1E4] bg-[#FBF8F7] px-4 py-3 text-center text-[11px] leading-5 text-[#756D72]">
+                Full caregiver revocation unavailable in this backend.
+              </div>
             </div>
           </div>
         </section>
