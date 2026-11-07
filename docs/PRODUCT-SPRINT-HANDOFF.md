@@ -1,5 +1,43 @@
 # Product sprint handoff
 
+## Deployment checkpoint — 7 November 2026
+
+This checkpoint supersedes the older infrastructure-access statements below.
+
+- Repository: https://github.com/saishishirponnuru-stack/MaatruCare . Verified production branch: `main`.
+- Release branch: `release/submission-2026-11-07`; application commit `2f40126`. Source was explicitly staged and scanned for local credentials; no environment files, databases, backups, virtual environments or build output were committed.
+- Vercel project `maatru-care` uses root `frontend`, Next.js and Node 24. The release built successfully: https://maatru-care-8bgxks8m0-shishir15.vercel.app . This preview requires Vercel authentication; its application UI was not smoke-tested publicly.
+- Production and Preview now have the correct Render API URL and existing Supabase public URL/key configured. No service-role key was uploaded.
+- Existing public production domains remain https://maatru-care.vercel.app and https://maatrucare.onrender.com . Both respond, but still run the older production revision. The release was deliberately not pushed to `main` or promoted.
+- Render service `srv-db9s61m1egvs738ecrj0` automatically deploys `main`, uses root `backend`, build `pip install -r requirements.txt`, and start `uvicorn app.main:app --host 0.0.0.0 --port $PORT`.
+- **Verified blocker:** Render is on the Free plan with no attached disk and no `DATABASE_URL`. It uses ephemeral SQLite. No Render PostgreSQL database is provisioned in this workspace. Restarting/deploying before preserving its data risks losing it; the new application also rejects ephemeral SQLite on Render.
+- Supabase public settings confirm email/password and Google are enabled, signups are enabled, confirmation is required, and the project's ES256 JWKS is reachable. Dashboard redirect/SMTP settings and real authenticated participation remain unverified.
+- Validation: backend `121 passed, 3 skipped`; frontend auth `23 passed`; TypeScript, ESLint and local production build passed. After the onboarding Suspense deployment fix, TypeScript/ESLint passed again and the Vercel cloud production build reached Ready.
+
+### Required before production cutover
+
+1. Preserve the running Render SQLite database using an existing verified backup or provider-assisted retrieval. Free web services do not offer SSH/Shell access. Do not restart, redeploy or upgrade the running service merely to obtain a backup; that can itself discard ephemeral files. A PostgreSQL connection does not migrate existing SQLite rows.
+2. Provision durable PostgreSQL through an approved provider, or use the existing Supabase project's PostgreSQL connection from its **Connect** dialog with the actual database password. Configure the real connection securely in Render as `DATABASE_URL`; do not paste credentials into chat or commit them. No paid service was purchased and no password was reset here.
+3. Import and verify retained records and relationships before switching traffic. Existing schema migrations are additive; they do not transfer SQLite data to PostgreSQL. If no backup can be recovered, stop for the owner's explicit decision rather than silently starting with an empty database.
+4. Configure these Render environment values together once the backup/migration is ready:
+
+   ```dotenv
+   MAATRUCARE_ENV=production
+   SUPABASE_ISSUER=https://qvbwpcnjshkrwvdcecmc.supabase.co/auth/v1
+   SUPABASE_JWKS_URL=https://qvbwpcnjshkrwvdcecmc.supabase.co/auth/v1/.well-known/jwks.json
+   SUPABASE_AUDIENCE=authenticated
+   CORS_ORIGINS=https://maatru-care.vercel.app
+   MAATRUCARE_TEST_AUTH_COMPAT=false
+   MAATRUCARE_DEMO_RESET_ENABLED=false
+   MAATRUCARE_SEED_DEMO_DATA=false
+   MAATRUCARE_PUBLIC_APP_URL=https://maatru-care.vercel.app
+   ```
+
+   Keep the existing backend Gemini credentials. Configure health check `/api/health`. Invitations retain the secure link fallback unless a verified sender/provider is configured. Keep simulation separately controlled.
+5. Run the read-only production preflight against the prepared environment; then fast-forward the verified production `main` branch to the tested release (never force-push). Verify Render's deployment/health, then Vercel Production and the real signed-in acceptance journey using an authorized account. Do not promote the frontend against the older incompatible backend.
+
+No production write/read persistence test, real sign-in journey, email delivery, database migration or production cutover is claimed by this checkpoint. Production remains blocked on verified backup and durable database configuration.
+
 ## Run locally (PowerShell, separate terminals)
 
 From the project root:
