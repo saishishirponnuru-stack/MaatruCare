@@ -1,4 +1,3 @@
-import os
 from datetime import datetime, timedelta
 from typing import Literal
 
@@ -13,6 +12,7 @@ from ..models import Account, Caregiver, CaregiverInvitation, Patient, Permissio
 from ..services.access_service import is_workspace_owner, require_patient_controller
 from ..services.audit_service import record_audit
 from ..services.invitation_email_service import delivery_capability, send_invitation_email, InvitationEmailError
+from ..services.demo_caregiver_service import demo_caregivers_available
 from ..services.auth_service import (
 	hash_invitation,
 	new_invitation_token,
@@ -270,7 +270,7 @@ def invitation_delivery(request: Request, db: Session = Depends(get_db)):
 	if not account.patient_id or not account.caregiver_id:
 		raise HTTPException(403, "Complete your care workspace setup first")
 	require_patient_controller(db, account.caregiver_id, account.patient_id)
-	return {**delivery_capability(), "simulated_available": os.getenv("MAATRUCARE_DEMO_CAREGIVERS_ENABLED", "false").lower() == "true"}
+	return {**delivery_capability(), "simulated_available": demo_caregivers_available(account.patient_id)}
 
 
 @router.get("/invitations")

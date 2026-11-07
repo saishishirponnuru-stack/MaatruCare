@@ -1,4 +1,3 @@
-import os
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -11,6 +10,7 @@ from ..models import Caregiver, ConsentRecord, Permission
 from ..schemas import CaregiverResponse
 from ..services.access_service import get_active_caregiver, require_patient_controller, require_patient_caregiver, require_permission
 from ..services.audit_service import record_audit
+from ..services.demo_caregiver_service import demo_caregivers_available
 
 router = APIRouter(prefix="/api/caregivers", tags=["caregivers"])
 
@@ -62,9 +62,9 @@ def list_caregivers(
 
 @router.post("/demo", response_model=CaregiverResponse, status_code=status.HTTP_201_CREATED)
 def create_demo_caregiver(payload: DemoCaregiverCreate, db: Session = Depends(get_db)) -> Caregiver:
-	if os.getenv("MAATRUCARE_DEMO_CAREGIVERS_ENABLED", "").lower() != "true":
-		raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Simulated caregivers are unavailable here")
 	actor = require_patient_controller(db, payload.actor_caregiver_id, payload.patient_id)
+	if not demo_caregivers_available(actor.patient_id):
+		raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Simulated caregivers are unavailable here")
 	name = payload.name.strip()
 	relationship = payload.relationship.strip()
 	email = payload.email.strip().lower() if payload.email else None
