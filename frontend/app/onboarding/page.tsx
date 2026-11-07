@@ -1,13 +1,13 @@
 "use client";
 
-import { FormEvent, useRef, useState } from "react";
+import { FormEvent, Suspense, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import AuthField from "@/components/auth/AuthField";
 import AuthPageShell from "@/components/auth/AuthPageShell";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
 
-export default function OnboardingPage() {
+function OnboardingForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { email, suggestedName, refreshAccount } = useAuth();
@@ -64,4 +64,8 @@ export default function OnboardingPage() {
       </form>
     </AuthPageShell>
   );
+}
+
+export default function OnboardingPage() {
+  return <Suspense fallback={<p role="status" className="p-6 text-sm text-[var(--mc-muted)]">Loading your care profile...</p>}><OnboardingForm /></Suspense>;
 }
