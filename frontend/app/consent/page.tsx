@@ -142,7 +142,7 @@ export default function ConsentPage() {
             </h1>
 
             <p className="mt-2 max-w-xl text-sm leading-6 text-[#756D72]">
-              Review the configured demo caregivers and their backend-enforced permission categories.
+              Review care team access and the permission categories enforced by the server.
             </p>
           </div>
         </div>
@@ -163,7 +163,7 @@ export default function ConsentPage() {
         {feedback && <div className="mt-5 rounded-[12px] border border-[#E4D7DF] bg-white px-3 py-2 text-xs font-medium text-[#6D3A5B]">{feedback}</div>}
 
         <section className="mt-8">
-          <SectionHeading eyebrow="Sharing overview" title="Configured demo permissions" />
+          <SectionHeading eyebrow="Sharing overview" title="Care team permissions" />
 
           <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             <SummaryCard icon={<Users size={17} />} label="Care Circle members" value={summary.members} />
@@ -173,7 +173,7 @@ export default function ConsentPage() {
         </section>
 
         <section className="mt-8">
-          <SectionHeading eyebrow="Synthetic directory" title="Example caregiver profiles" />
+          <SectionHeading eyebrow="Care team" title="People with access" />
 
           <div className="mt-4 grid gap-4 lg:grid-cols-3">
             {caregivers.map((caregiver, index) => {
@@ -211,7 +211,7 @@ export default function ConsentPage() {
                   </div>
 
                   <div className="mt-5 flex items-center justify-between border-t border-[#F0E9EC] pt-4">
-                    <span className="rounded-full bg-[#F3EAF0] px-2.5 py-1.5 text-[9px] font-semibold text-[#6D3A5B]">Sample profile</span>
+                    <span className="rounded-full bg-[#F3EAF0] px-2.5 py-1.5 text-[9px] font-semibold text-[#6D3A5B]">Care team member</span>
                     <span className="text-[10px] font-medium text-[#756D72]">{permissionCount}/4 approved</span>
                   </div>
 
@@ -288,7 +288,7 @@ export default function ConsentPage() {
                 </div>
               ))}
             </div>
-            <p className="mt-3 text-[10px] text-[#9A9196]">Synthetic demo activity for this prototype.</p>
+            <p className="mt-3 text-[10px] text-[#9A9196]">Recent access activity.</p>
           </div>
 
           <div className="rounded-[18px] border border-[#E9E1E4] bg-white p-5 shadow-[0_6px_24px_rgba(33,28,31,0.025)]">

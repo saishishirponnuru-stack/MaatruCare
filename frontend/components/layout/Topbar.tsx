@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { HeartPulse, Menu, Moon, Sun, UserRound, X } from "lucide-react";
+import { Menu, Moon, Sun, UserRound, X } from "lucide-react";
 import { motion } from "framer-motion";
 import type { RefObject } from "react";
 import { usePreferences } from "@/context/PreferencesContext";
@@ -54,7 +55,15 @@ export default function Topbar({
         </motion.button>
 
         <Link href="/dashboard" aria-label="MaatruCare home" className="flex min-w-0 items-center gap-2.5 lg:hidden">
-          <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-[var(--mc-brand)] text-white"><HeartPulse size={18} strokeWidth={2.2} /></span>
+          <Image
+            src="/maatru-care-mark.webp"
+            alt=""
+            aria-hidden="true"
+            width={512}
+            height={512}
+            priority
+            className="mc-brand-mark h-9 w-9 shrink-0 object-contain"
+          />
           <span className="min-w-0">
             <span className="block truncate text-[12px] font-semibold tracking-[0.01em] text-[var(--mc-text)]">MaatruCare</span>
             <span className="block truncate text-[11px] font-medium text-[var(--mc-muted)]">{title}</span>
@@ -62,7 +71,7 @@ export default function Topbar({
         </Link>
 
         <div className="hidden min-w-0 lg:block">
-          <p className="truncate text-[10px] font-medium text-[var(--mc-muted)]">Patient-controlled care · synthetic demo</p>
+          <p className="truncate text-[10px] font-medium text-[var(--mc-muted)]">Patient-controlled care</p>
           <p className="truncate text-[16px] font-semibold tracking-[-0.02em] text-[var(--mc-text)]">{title}</p>
         </div>
       </div>
@@ -80,9 +89,9 @@ export default function Topbar({
         >
           {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
         </motion.button>
-        <Link href="/profile" aria-label="View sample profile" title="View sample profile" className="hidden h-10 items-center gap-2 rounded-[11px] border border-[var(--mc-border)] bg-[var(--mc-surface)] px-3 text-xs font-semibold text-[var(--mc-brand)] transition hover:bg-[var(--mc-surface-muted)] lg:flex">
+        <Link href="/profile" aria-label="View care profile" title="View care profile" className="hidden h-10 items-center gap-2 rounded-[11px] border border-[var(--mc-border)] bg-[var(--mc-surface)] px-3 text-xs font-semibold text-[var(--mc-brand)] transition hover:bg-[var(--mc-surface-muted)] lg:flex">
           <UserRound size={16} />
-          Sample profile
+          Care profile
         </Link>
       </div>
     </header>

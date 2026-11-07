@@ -4,7 +4,7 @@ import AppShell from "@/components/layout/AppShell";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { FormEvent, useMemo, useState } from "react";
-import { Pencil, ArrowUpRight, Car, Check, CheckSquare, Circle, FileText, Plus, Search, UserRound, Users, X } from "lucide-react";
+import { Pencil, ArrowUpRight, Car, Check, CheckSquare, Circle, FileText, Plus, Search, Trash2, UserRound, Users, X } from "lucide-react";
 import { useMaatruCareDemo, type DemoCategory as Category, type DemoOwner as Owner, type DemoTask as Task } from "@/context/MaatruCareDemoContext";
 
 type Status = "Open" | "Completed";
@@ -23,7 +23,7 @@ function defaultDueDate() {
 const emptyForm = { title: "", owner: "Rahul Rao" as Owner, category: "Coordination" as Category, dueDate: defaultDueDate(), note: "" };
 
 export default function TasksPage() {
-  const { tasks, addTask: addTaskAction, updateTask, completeTask, reassignTask: reassignTaskAction } = useMaatruCareDemo();
+  const { tasks, addTask: addTaskAction, updateTask, completeTask, deleteTask, reassignTask: reassignTaskAction } = useMaatruCareDemo();
   const [filter, setFilter] = useState("all");
   const [category, setCategory] = useState("All");
   const [search, setSearch] = useState("");
@@ -33,6 +33,8 @@ export default function TasksPage() {
   const [form, setForm] = useState(emptyForm);
   const [toast, setToast] = useState("");
   const [handoff, setHandoff] = useState<Task | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Task | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   function notify(message: string) { setToast(message); window.setTimeout(() => setToast(""), 2800); }
   function editForm(task: Task) { setForm({ title: task.title, owner: task.owner, category: task.category, dueDate: task.dueDate, note: task.note }); }
@@ -40,6 +42,23 @@ export default function TasksPage() {
   async function toggleTask(task: Task) { const status: Status = task.status === "Open" ? "Completed" : "Open"; try { await completeTask(task.id); setSelected({ ...task, status }); notify(status === "Completed" ? "Task completed. Activity recorded in Timeline." : "Task reopened. Activity recorded in Timeline."); } catch (error) { notify(error instanceof Error ? error.message : "Task changes are unavailable."); } }
   async function saveTask(event: FormEvent) { event.preventDefault(); if (!selected || !form.title.trim()) return; try { await updateTask(selected.id, { ...form, title: form.title.trim() });  setSelected({ ...selected, ...form, title: form.title.trim() }); setEditing(false); notify("Task updated."); } catch (error) { notify(error instanceof Error ? error.message : "Task changes are unavailable."); } }
   async function addTask(event: FormEvent) { event.preventDefault(); if (!form.title.trim()) return; try { await addTaskAction({ ...form, title: form.title.trim(), note: form.note.trim() || "No additional note." }); setDrawer(null); setForm(emptyForm); notify("Task created."); } catch (error) { notify(error instanceof Error ? error.message : "Task creation is unavailable."); } }
+  async function confirmDelete() {
+    if (!deleteTarget || deleting) return;
+    setDeleting(true);
+    try {
+      await deleteTask(deleteTarget.id);
+      if (selected?.id === deleteTarget.id) {
+        setSelected(null);
+        setDrawer(null);
+      }
+      setDeleteTarget(null);
+      notify(`Task "${deleteTarget.title}" deleted.`);
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Task deletion is unavailable.");
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   async function reassignSelectedTask(task: Task, owner: CaregiverOwner) {
     try {
@@ -79,13 +98,25 @@ export default function TasksPage() {
   <Pencil size={12} />
   Edit
 </button>
+<button
+  type="button"
+  onClick={(event) => {
+    event.stopPropagation();
+    setDeleteTarget(task);
+  }}
+  aria-label={`Delete ${task.title}`}
+  title="Delete task"
+  className="order-last inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] text-[#A85562] transition hover:bg-[#FFF5F5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#A85562]"
+>
+  <Trash2 size={14} />
+</button>
 <div className="flex flex-wrap items-center gap-2"><span className="flex items-center gap-2 text-[10px]"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#E8D7E0] text-[9px] font-bold text-[#6D3A5B]">{initials(task.owner)}</span>{task.owner}</span><span className="rounded-full bg-[#F5F1F3] px-2.5 py-1 text-[9px] font-semibold text-[#756D72]">{task.category}</span><span className={`rounded-full px-2.5 py-1 text-[9px] font-semibold ${done ? "bg-[#EEF5F0] text-[#4F8068]" : "bg-[#F3EAF0] text-[#6D3A5B]"}`}>{task.status}</span></div></div>; })}</div> : <div className="px-6 py-14 text-center"><Search size={19} className="mx-auto text-[#B86B87]" /><p className="mt-4 text-sm font-semibold text-[#211C1F]">{tasks.length ? "No tasks match this view" : "No tasks yet"}</p><p className="mt-2 text-xs text-[#756D72]">Try another filter or add a coordination task.</p></div>}</section>
-  </div><AnimatePresence>{drawer === "add" && <TaskDrawer title="Add coordination task" form={form} setForm={setForm} onClose={() => setDrawer(null)} onSubmit={addTask} submitLabel="Create task" />}{drawer === "details" && selected && <TaskDrawer title="Task details" form={form} setForm={setForm} task={selected} editing={editing} onEdit={() => setEditing(true)} onClose={() => setDrawer(null)} onSubmit={saveTask} submitLabel="Save changes" onComplete={() => toggleTask(selected)} onHandoff={() => setHandoff(selected)} />}{handoff && <AssignmentDrawer task={handoff} onClose={() => setHandoff(null)} onSave={(owner) => reassignSelectedTask(handoff, owner)} />}</AnimatePresence></AppShell>;
+  </div><AnimatePresence>{drawer === "add" && <TaskDrawer title="Add coordination task" form={form} setForm={setForm} onClose={() => setDrawer(null)} onSubmit={addTask} submitLabel="Create task" />}{drawer === "details" && selected && <TaskDrawer title="Task details" form={form} setForm={setForm} task={selected} editing={editing} onEdit={() => setEditing(true)} onClose={() => setDrawer(null)} onSubmit={saveTask} submitLabel="Save changes" onComplete={() => toggleTask(selected)} onHandoff={() => setHandoff(selected)} />}{handoff && <AssignmentDrawer task={handoff} onClose={() => setHandoff(null)} onSave={(owner) => reassignSelectedTask(handoff, owner)} />}{deleteTarget && <DeleteTaskDialog task={deleteTarget} deleting={deleting} onClose={() => setDeleteTarget(null)} onConfirm={() => void confirmDelete()} />}</AnimatePresence></AppShell>;
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="block"><span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9A9196]">{label}</span><div className="mt-2">{children}</div></label>; }
 const inputClass = "w-full rounded-[12px] border border-[#E9E1E4] bg-white px-3 py-2.5 text-xs text-[#211C1F] outline-none focus:border-[#6D3A5B]";
-function TaskDrawer({ title, form, setForm, task, editing = false, onEdit, onComplete, onHandoff, onClose, onSubmit, submitLabel }: { title: string; form: typeof emptyForm; setForm: (form: typeof emptyForm) => void; task?: Task; editing?: boolean; onEdit?: () => void; onComplete?: () => void; onHandoff?: () => void; onClose: () => void; onSubmit: (event: FormEvent) => void; submitLabel: string }) { return <><motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[2px]" /><motion.aside initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }} className="fixed right-0 top-0 z-50 flex h-full w-full max-w-md flex-col border-l border-[#E9E1E4] bg-white shadow-2xl"><div className="flex items-center justify-between border-b border-[#E9E1E4] px-6 py-5"><div><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9A9196]">{task ? "Task details" : "New task"}</p><h2 className="mt-1 text-lg font-semibold text-[#211C1F]">{title}</h2></div><button type="button" onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-full bg-[#F7F3F5] text-[#756D72]"><X size={17} /></button></div>{task && !editing ? <div className="flex flex-1 flex-col"><div className="flex-1 space-y-5 overflow-y-auto px-6 py-6"><Detail label="Owner" value={task.owner} /><Detail label="Category" value={task.category} /><Detail label="Due date" value={dateLabel(task.dueDate)} /><Detail label="Status" value={task.status} /><Detail label="Note" value={task.note} /><Detail label="Created by" value={task.createdBy} /><div className="rounded-[14px] bg-[#F8F2F6] p-4"><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9A9196]">Sample appointment context</p><p className="mt-2 text-xs font-semibold text-[#211C1F]">Fictional visit · 28 Sep, 10:30 AM</p><p className="mt-1 text-[10px] text-[#756D72]">Example clinic (demo)</p></div></div><div className="space-y-2 border-t border-[#E9E1E4] p-6"><div className="grid gap-2 sm:grid-cols-2"><button type="button" onClick={onComplete} className="rounded-[12px] bg-[#6D3A5B] py-3 text-xs font-semibold text-white">{task.status === "Completed" ? "Reopen task" : "Complete task"}</button><button type="button" onClick={onEdit} className="rounded-[12px] border border-[#D8C5D0] py-3 text-xs font-semibold text-[#6D3A5B]">Edit / Reassign</button></div>{task.status === "Open" && <button type="button" onClick={onHandoff} className="w-full rounded-[12px] border border-[#E9E1E4] py-3 text-xs font-semibold text-[#6D3A5B]">Reassign task</button>}</div></div> : <form onSubmit={onSubmit} className="flex flex-1 flex-col"><div className="flex-1 space-y-5 overflow-y-auto px-6 py-6"><Field label="Task title"><input required value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} className={inputClass} /></Field><Field label="Assign to"><select value={form.owner} onChange={(event) => setForm({ ...form, owner: event.target.value as Owner })} className={inputClass}>{owners.map((owner) => <option key={owner}>{owner}</option>)}</select></Field><Field label="Category"><select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value as Category })} className={inputClass}>{categories.map((item) => <option key={item}>{item}</option>)}</select></Field><Field label="Due date"><input required type="date" value={form.dueDate} onChange={(event) => setForm({ ...form, dueDate: event.target.value })} className={inputClass} /></Field><Field label="Optional note"><textarea value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} rows={4} className={`${inputClass} resize-none`} /></Field></div><div className="border-t border-[#E9E1E4] p-6"><button type="submit" className="w-full rounded-[13px] bg-[#6D3A5B] py-3 text-xs font-semibold text-white">{submitLabel}</button></div></form>}</motion.aside></>; }
+function TaskDrawer({ title, form, setForm, task, editing = false, onEdit, onComplete, onHandoff, onClose, onSubmit, submitLabel }: { title: string; form: typeof emptyForm; setForm: (form: typeof emptyForm) => void; task?: Task; editing?: boolean; onEdit?: () => void; onComplete?: () => void; onHandoff?: () => void; onClose: () => void; onSubmit: (event: FormEvent) => void; submitLabel: string }) { return <><motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[2px]" /><motion.aside initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }} className="fixed right-0 top-0 z-50 flex h-full w-full max-w-md flex-col border-l border-[#E9E1E4] bg-white shadow-2xl"><div className="flex items-center justify-between border-b border-[#E9E1E4] px-6 py-5"><div><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9A9196]">{task ? "Task details" : "New task"}</p><h2 className="mt-1 text-lg font-semibold text-[#211C1F]">{title}</h2></div><button type="button" onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-full bg-[#F7F3F5] text-[#756D72]"><X size={17} /></button></div>{task && !editing ? <div className="flex flex-1 flex-col"><div className="flex-1 space-y-5 overflow-y-auto px-6 py-6"><Detail label="Owner" value={task.owner} /><Detail label="Category" value={task.category} /><Detail label="Due date" value={dateLabel(task.dueDate)} /><Detail label="Status" value={task.status} /><Detail label="Note" value={task.note} /><Detail label="Created by" value={task.createdBy} /><div className="rounded-[14px] bg-[#F8F2F6] p-4"><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9A9196]">Appointment context</p><p className="mt-2 text-xs font-semibold text-[#211C1F]">No linked appointment</p><p className="mt-1 text-[10px] text-[#756D72]">Link an appointment when available</p></div></div><div className="space-y-2 border-t border-[#E9E1E4] p-6"><div className="grid gap-2 sm:grid-cols-2"><button type="button" onClick={onComplete} className="rounded-[12px] bg-[#6D3A5B] py-3 text-xs font-semibold text-white">{task.status === "Completed" ? "Reopen task" : "Complete task"}</button><button type="button" onClick={onEdit} className="rounded-[12px] border border-[#D8C5D0] py-3 text-xs font-semibold text-[#6D3A5B]">Edit / Reassign</button></div>{task.status === "Open" && <button type="button" onClick={onHandoff} className="w-full rounded-[12px] border border-[#E9E1E4] py-3 text-xs font-semibold text-[#6D3A5B]">Reassign task</button>}</div></div> : <form onSubmit={onSubmit} className="flex flex-1 flex-col"><div className="flex-1 space-y-5 overflow-y-auto px-6 py-6"><Field label="Task title"><input required value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} className={inputClass} /></Field><Field label="Assign to"><select value={form.owner} onChange={(event) => setForm({ ...form, owner: event.target.value as Owner })} className={inputClass}>{owners.map((owner) => <option key={owner}>{owner}</option>)}</select></Field><Field label="Category"><select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value as Category })} className={inputClass}>{categories.map((item) => <option key={item}>{item}</option>)}</select></Field><Field label="Due date"><input required type="date" value={form.dueDate} onChange={(event) => setForm({ ...form, dueDate: event.target.value })} className={inputClass} /></Field><Field label="Optional note"><textarea value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} rows={4} className={`${inputClass} resize-none`} /></Field></div><div className="border-t border-[#E9E1E4] p-6"><button type="submit" className="w-full rounded-[13px] bg-[#6D3A5B] py-3 text-xs font-semibold text-white">{submitLabel}</button></div></form>}</motion.aside></>; }
 function Detail({ label, value }: { label: string; value: string }) { return <div className="border-b border-[#F0E9EC] pb-4"><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9A9196]">{label}</p><p className="mt-2 text-xs leading-5 text-[#211C1F]">{value}</p></div>; }
 function AssignmentDrawer({ task, onClose, onSave }: { task: Task; onClose: () => void; onSave: (owner: CaregiverOwner) => Promise<void> }) {
   const recipientOptions: CaregiverOwner[] = (["Rahul Rao", "Lakshmi Rao", "Priya Rao"] as const).filter((owner) => owner !== task.owner);
@@ -100,7 +131,17 @@ function AssignmentDrawer({ task, onClose, onSave }: { task: Task; onClose: () =
     } finally {
       setSaving(false);
     }
+
   }
 
   return <><motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[2px]" /><motion.aside initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }} className="fixed right-0 top-0 z-50 flex h-full w-full max-w-md flex-col border-l border-[#E9E1E4] bg-white shadow-2xl"><div className="flex items-center justify-between border-b border-[#E9E1E4] px-6 py-5"><div><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9A9196]">Task assignment</p><h2 className="mt-1 text-lg font-semibold text-[#211C1F]">Reassign responsibility</h2></div><button type="button" aria-label="Close reassignment" onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-full bg-[#F7F3F5] text-[#756D72]"><X size={17} /></button></div><div className="flex-1 space-y-5 px-6 py-6"><Detail label="Current owner" value={task.owner} /><Field label="New owner"><select value={recipient} onChange={(event) => setRecipient(event.target.value as CaregiverOwner)} className={inputClass}>{recipientOptions.map((owner) => <option key={owner} value={owner}>{owner}</option>)}</select></Field><Detail label="Task" value={task.title} /><p className="rounded-[14px] bg-[#F8F2F6] p-4 text-[11px] leading-5 text-[#756D72]">This updates the task owner through the permission-checked backend. It does not create a formal care handoff or acknowledgement.</p></div><div className="border-t border-[#E9E1E4] p-6"><button type="button" disabled={saving || recipientOptions.length === 0} aria-busy={saving} onClick={() => void save()} className="w-full rounded-[13px] bg-[#6D3A5B] py-3 text-xs font-semibold text-white disabled:cursor-wait disabled:opacity-60">{saving ? "Saving assignment…" : "Save new owner"}</button></div></motion.aside></>;
+}
+
+function DeleteTaskDialog({ task, deleting, onClose, onConfirm }: { task: Task; deleting: boolean; onClose: () => void; onConfirm: () => void }) {
+  return <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60] flex items-center justify-center bg-black/25 p-4">
+    <motion.div initial={{ scale: 0.98, y: 6 }} animate={{ scale: 1, y: 0 }} className="w-full max-w-sm rounded-[18px] border border-[#E9E1E4] bg-white p-5 shadow-2xl">
+      <div className="flex items-start gap-3"><div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-[#FFF1F1] text-[#A85562]"><Trash2 size={16} /></div><div><h2 className="text-sm font-semibold text-[#211C1F]">Delete task?</h2><p className="mt-1 text-xs leading-5 text-[#756D72]">“{task.title}” will be removed from coordination tasks. Its existing audit and timeline history will remain protected.</p></div></div>
+      <div className="mt-5 flex gap-2"><button type="button" disabled={deleting} onClick={onClose} className="flex-1 rounded-[11px] border border-[#E9E1E4] py-2.5 text-xs font-semibold text-[#756D72] disabled:opacity-60">Keep task</button><button type="button" disabled={deleting} onClick={onConfirm} className="flex-1 rounded-[11px] bg-[#A85562] py-2.5 text-xs font-semibold text-white disabled:cursor-wait disabled:opacity-60">{deleting ? "Deleting…" : "Delete task"}</button></div>
+    </motion.div>
+  </motion.div>;
 }

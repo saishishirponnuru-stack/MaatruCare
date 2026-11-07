@@ -93,3 +93,91 @@ def test_task_creation_completion_and_reopening_record_timeline_events(client: T
                 "A coordination task was completed.",
                 "A coordination task was reopened.",
         ]
+
+
+def test_task_delete_persists_and_preserves_audit_history(client: TestClient, db_session) -> None:
+        from app.models import Task, TimelineEvent
+
+        created = client.post(
+                "/api/tasks",
+                json={
+                        "patient_id": 1,
+                        "title": "Delete regression task",
+                        "owner_id": 2,
+                        "due_date": "2026-10-28",
+                        "category": "Coordination",
+                        "actor_caregiver_id": 1,
+                },
+        )
+        assert created.status_code == 201
+        task_id = created.json()["id"]
+
+        deleted = client.request("DELETE", f"/api/tasks/{task_id}", json={"actor_caregiver_id": 1})
+        assert deleted.status_code == 204
+        assert db_session.get(Task, task_id) is None
+        assert db_session.scalar(select(AuditLog.action).where(AuditLog.resource_type == "Task", AuditLog.resource_id == task_id).order_by(AuditLog.id.desc())) == "task_deleted"
+        removal_event = db_session.scalar(
+                select(TimelineEvent).where(
+                        TimelineEvent.source == "Coordination task",
+                        TimelineEvent.title == "Task removed",
+                        TimelineEvent.description == 'Task "Delete regression task" was removed from current responsibilities.',
+                )
+        )
+        assert removal_event is not None
+        assert client.request("DELETE", f"/api/tasks/{task_id}", json={"actor_caregiver_id": 1}).status_code == 404
+
+
+def test_repeated_task_completion_does_not_duplicate_history(client: TestClient, db_session) -> None:
+        from app.models import TimelineEvent
+
+        created = client.post(
+                "/api/tasks",
+                json={
+                        "patient_id": 1,
+                        "title": "Idempotent completion task",
+                        "owner_id": 2,
+                        "due_date": "2026-10-28",
+                        "category": "Coordination",
+                        "actor_caregiver_id": 1,
+                },
+        )
+        task_id = created.json()["id"]
+        assert client.post(f"/api/tasks/{task_id}/complete", json={"actor_caregiver_id": 1, "completed": True}).status_code == 200
+        assert client.post(f"/api/tasks/{task_id}/complete", json={"actor_caregiver_id": 1, "completed": True}).status_code == 409
+        events = db_session.scalars(
+                select(TimelineEvent).where(
+                        TimelineEvent.source == "Coordination task",
+                        TimelineEvent.title == "Idempotent completion task",
+                )
+        ).all()
+        assert [event.description for event in events] == [
+                "A coordination task was created.",
+                "A coordination task was completed.",
+        ]
+
+
+def test_task_delete_requires_patient_scoped_permission(client: TestClient, db_session) -> None:
+        from app.models import Permission
+        from sqlalchemy import select
+
+        created = client.post(
+                "/api/tasks",
+                json={
+                        "patient_id": 1,
+                        "title": "Unauthorized delete task",
+                        "owner_id": 2,
+                        "due_date": "2026-10-28",
+                        "category": "Coordination",
+                        "actor_caregiver_id": 1,
+                },
+        )
+        task_id = created.json()["id"]
+        permission = db_session.scalar(select(Permission).where(Permission.caregiver_id == 3, Permission.permission_name == "Coordination tasks"))
+        original_enabled = permission.enabled
+        permission.enabled = False
+        db_session.commit()
+        try:
+                assert client.request("DELETE", f"/api/tasks/{task_id}", json={"actor_caregiver_id": 3}).status_code == 403
+        finally:
+                permission.enabled = original_enabled
+                db_session.commit()

@@ -76,7 +76,7 @@ export default function SettingsPage() {
   }
 
   async function resetLifestyle() {
-    if (!window.confirm("Reset this demo patient’s Lifestyle logs? Hydration, sleep, weight, adherence, activity logs, and optionally goals will be removed. Recommendations and unrelated care data will remain.")) return;
+    if (!window.confirm("Reset this patient’s Lifestyle logs? Hydration, sleep, weight, adherence, activity logs, and optionally goals will be removed. Recommendations and unrelated care data will remain.")) return;
     setResetMessage("");
     setResetSucceeded(false);
     setResetting(true);
@@ -87,7 +87,7 @@ export default function SettingsPage() {
     } catch (error) {
       const detail = error instanceof Error ? error.message : "Lifestyle reset could not be completed.";
       setResetMessage(detail === "Demo reset is disabled"
-        ? "Reset unavailable: the backend demo-reset flag is off (the default). Only a backend operator may explicitly enable it for a disposable synthetic-data demo; this screen cannot enable it. Keep it off for production."
+        ? "Reset is currently unavailable. A server administrator must enable it before use."
         : detail);
     } finally {
       setResetting(false);
@@ -98,20 +98,20 @@ export default function SettingsPage() {
     <AppShell>
       <div className="transition-colors">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9A9196]">Local demo preferences</p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9A9196]">Preferences</p>
           <h1 className="mt-2 text-3xl font-semibold tracking-[-0.03em] text-[#211C1F]">Settings</h1>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-[#756D72]">Choose how this browser displays the MaatruCare demo. These settings do not create an account or change backend access.</p>
+          <p className="mt-2 max-w-xl text-sm leading-6 text-[#756D72]">Choose how MaatruCare appears in this browser. Backend access remains protected.</p>
         </div>
 
         <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(340px,0.8fr)]">
           <div className="space-y-6">
-            <SettingsSection reducedMotion={reducedMotion} eyebrow="Sample profile" title="Local display profile" iconTone="violet" icon={<UserRound size={17} />}>
+            <SettingsSection reducedMotion={reducedMotion} eyebrow="Care profile" title="Local display profile" iconTone="violet" icon={<UserRound size={17} />}>
               <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex min-w-0 items-center gap-4">
                   <div aria-hidden="true" className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[18px] bg-[#E8D7E0] text-lg font-semibold text-[#6D3A5B]">{initials(profile.name)}</div>
                   <div className="min-w-0">
                     <h2 className="truncate text-lg font-semibold text-[#211C1F]">{profile.name}</h2>
-                    <p className="mt-1 text-xs text-[#9A9196]">Synthetic patient profile · stored in this browser only</p>
+                    <p className="mt-1 text-xs text-[#9A9196]">Profile details · stored in this browser only</p>
                   </div>
                 </div>
                 <Link href="/profile" className="flex h-10 shrink-0 items-center justify-center gap-2 rounded-[11px] border border-[#DCCBD5] bg-white px-3 text-xs font-semibold text-[#6D3A5B] transition hover:border-[#B86B87] hover:bg-[#FBF8F7]"><UserRoundPen size={15} />Edit profile</Link>
@@ -121,11 +121,11 @@ export default function SettingsPage() {
                 <InfoItem icon={<Mail size={15} />} label="Email" value={profile.email} />
                 <InfoItem icon={<Globe2 size={15} />} label="Preferred language" value={carePreferences.preferredLanguage} />
               </div>
-              <p className="mt-4 rounded-[12px] bg-[#FBF8F7] p-3 text-[11px] leading-5 text-[#756D72]">This sample has no authenticated account or backend profile. Do not enter real patient, caregiver, or contact details.</p>
+              <p className="mt-4 rounded-[12px] bg-[#FBF8F7] p-3 text-[11px] leading-5 text-[#756D72]">Profile details are stored in this browser only. Do not enter real patient, caregiver, or contact details.</p>
             </SettingsSection>
 
             <SettingsSection reducedMotion={reducedMotion} eyebrow="Care preferences" title="Future coordination preferences" iconTone="teal" icon={<SlidersHorizontal size={17} />}>
-              <p className="mb-5 rounded-[12px] bg-[#FBF8F7] p-3 text-[11px] leading-5 text-[#756D72]">Selections are saved locally for demonstration. The interface remains in English; these choices do not send messages, schedule reminders, or change sharing permissions.</p>
+              <p className="mb-5 rounded-[12px] bg-[#FBF8F7] p-3 text-[11px] leading-5 text-[#756D72]">Selections are saved in this browser. These choices do not send messages, schedule reminders, or change sharing permissions.</p>
               <div className="grid gap-x-5 gap-y-5 sm:grid-cols-2">
                 {carePreferenceItems.map((item) => (
                   <SelectField key={item.key} label={item.label} value={carePreferences[item.key]} onChange={(value) => setCarePreference(item.key, value)} options={item.options} />
@@ -134,7 +134,7 @@ export default function SettingsPage() {
             </SettingsSection>
 
             <SettingsSection reducedMotion={reducedMotion} eyebrow="Notifications" title="Local notification preferences" iconTone="sky" icon={<Bell size={17} />}>
-              <p className="mb-5 rounded-[12px] bg-[#FBF8F7] p-3 text-[11px] leading-5 text-[#756D72]">These switches persist in this browser only. This demo does not send email, SMS, push notifications, or reminder alerts.</p>
+              <p className="mb-5 rounded-[12px] bg-[#FBF8F7] p-3 text-[11px] leading-5 text-[#756D72]">These switches persist in this browser only. Email, SMS, push notifications, and reminders are not sent.</p>
               <div className="divide-y divide-[#EFE8EB]">
                 {notificationItems.map((item) => (
                   <ToggleRow key={item.key} title={item.title} description={item.description} enabled={notifications[item.key]} onToggle={() => toggleNotification(item.key)} />
@@ -144,10 +144,10 @@ export default function SettingsPage() {
           </div>
 
           <div className="space-y-6">
-            <SettingsSection reducedMotion={reducedMotion} eyebrow="Privacy & patient control" title="Demo access boundaries" iconTone="indigo" icon={<ShieldCheck size={17} />} tone="rose">
+            <SettingsSection reducedMotion={reducedMotion} eyebrow="Privacy & patient control" title="Access boundaries" iconTone="indigo" icon={<ShieldCheck size={17} />} tone="rose">
               <div className="flex gap-3 rounded-[14px] bg-[#FBF8F7] p-4">
                 <LockKeyhole size={18} className="mt-0.5 shrink-0 text-[#6D3A5B]" />
-                <p className="text-xs leading-5 text-[#756D72]">This demo uses synthetic records and a fixed demo actor; it has no sign-in or production patient account. Server permission checks remain enabled for protected coordination data. Use fictional data only.</p>
+                <p className="text-xs leading-5 text-[#756D72]">This workspace uses a fixed care-team context. Server permission checks remain enabled for protected coordination data. Do not enter real patient or caregiver information.</p>
               </div>
               <div className="mt-4 space-y-2">
                 <LinkRow href="/consent" icon={<Eye size={16} />} title="Review sharing permissions" description="Change individual permission categories where the backend supports it." />
@@ -164,19 +164,18 @@ export default function SettingsPage() {
               </div>
             </SettingsSection>
 
-            <SettingsSection reducedMotion={reducedMotion} eyebrow="Account" title="Account actions unavailable" iconTone="slate" icon={<MessageCircle size={17} />}>
+            <SettingsSection reducedMotion={reducedMotion} eyebrow="Account" title="Account actions" iconTone="slate" icon={<MessageCircle size={17} />}>
               <div className="flex items-start gap-3 rounded-[14px] bg-[#FBF8F7] p-4">
                 <LockKeyhole size={17} className="mt-0.5 shrink-0 text-[#6D3A5B]" />
-                <p className="text-xs leading-5 text-[#756D72]">This prototype has no account authentication or account-management API. Password changes, sign-out, and account deletion are not available here.</p>
+                <p className="text-xs leading-5 text-[#756D72]">Password changes, sign-out, and account deletion are not available in this workspace.</p>
               </div>
             </SettingsSection>
 
-            <SettingsSection reducedMotion={reducedMotion} eyebrow="Data management" title="Synthetic Lifestyle reset" iconTone="amber" icon={<RotateCcw size={17} />}>
-              <p className="text-xs leading-5 text-[#756D72]">This guarded demo action removes Lifestyle logs for the selected synthetic patient only. It preserves recommendations, care coordination records, permissions, and other patients. Availability is controlled by the server-side <code>MAATRUCARE_DEMO_RESET_ENABLED</code> flag, which is off by default. This screen cannot enable it; keep it off for production.</p>
+            <SettingsSection reducedMotion={reducedMotion} eyebrow="Data management" title="Lifestyle data reset" iconTone="amber" icon={<RotateCcw size={17} />}>
+              <p className="text-xs leading-5 text-[#756D72]">This guarded action removes Lifestyle logs for the selected patient only. Recommendations, care coordination records, permissions, and other patients are preserved. It is available only when enabled by the server.</p>
               <label className="mt-4 flex items-start gap-3 rounded-[11px] bg-[#FBF8F7] p-3 text-xs leading-5 text-[#756D72]"><input type="checkbox" checked={resetPreferences} onChange={(event) => setResetPreferences(event.target.checked)} className="mt-1 h-4 w-4 accent-[#6D3A5B]" />Also reset personal Lifestyle goals and preferences.</label>
               <button type="button" onClick={() => void resetLifestyle()} disabled={resetting} className="mt-4 flex min-h-11 items-center gap-2 rounded-[11px] border border-[#D8B7AD] px-4 py-3 text-xs font-semibold text-[#9A5145] transition hover:bg-[#FFF5F2] disabled:cursor-not-allowed disabled:opacity-60"><RotateCcw size={15} />{resetting ? "Resetting…" : "Reset Lifestyle Data"}</button>
               {resetMessage && <div role={resetSucceeded ? "status" : "alert"} className="mt-3 rounded-[11px] bg-[#FBF8F7] p-3 text-[11px] leading-5 text-[#756D72]"><p>{resetMessage}</p>{resetSucceeded && <Link href="/lifestyle" className="mt-2 inline-flex min-h-9 items-center font-semibold text-[#6D3A5B] underline underline-offset-2">Review refreshed Lifestyle records</Link>}</div>}
-              <p className="mt-3 text-[10px] leading-4 text-[#9A9196]">Reset All Demo Data is intentionally unavailable because this prototype does not have a sufficiently explicit, tested cross-feature deletion boundary.</p>
             </SettingsSection>
           </div>
         </div>

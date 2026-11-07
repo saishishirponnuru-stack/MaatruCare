@@ -97,3 +97,46 @@ def test_diet_and_activity_records_can_be_created_and_updated(client: TestClient
         f"/api/lifestyle/activities/logs/{log.json()['id']}",
         json={"actor_caregiver_id": 1, "log_date": "2026-11-06", "completed": True},
     ).status_code == 200
+
+
+def test_lifestyle_individual_deletes_persist_and_reject_missing_records(client: TestClient) -> None:
+    sleep = client.post(
+        "/api/lifestyle/sleep",
+        json={"patient_id": 1, "actor_caregiver_id": 1, "log_date": "2026-11-06", "status": "Restful", "duration_hours": 8},
+    )
+    weight = client.post(
+        "/api/lifestyle/weight",
+        json={"patient_id": 1, "actor_caregiver_id": 1, "entry_date": "2026-11-06", "weight_kg": 62.5},
+    )
+    assert sleep.status_code == 200
+    assert weight.status_code == 200
+    sleep_id = sleep.json()["id"]
+    weight_id = weight.json()["id"]
+    assert client.delete(f"/api/lifestyle/sleep/{sleep_id}?actor_caregiver_id=1").status_code == 200
+    assert client.delete(f"/api/lifestyle/weight/{weight_id}?actor_caregiver_id=1").status_code == 200
+    payload = client.get("/api/lifestyle?patient_id=1&actor_caregiver_id=1").json()
+    assert all(item["id"] != sleep_id for item in payload["sleep"])
+    assert all(item["id"] != weight_id for item in payload["weight"])
+    assert client.delete(f"/api/lifestyle/sleep/{sleep_id}?actor_caregiver_id=1").status_code == 404
+
+
+def test_lifestyle_delete_is_primary_caregiver_only(client: TestClient) -> None:
+    created = client.post("/api/lifestyle/weight", json={"patient_id": 1, "actor_caregiver_id": 1, "entry_date": "2026-11-06", "weight_kg": 62.5})
+    assert created.status_code == 200
+    assert client.delete(f"/api/lifestyle/weight/{created.json()['id']}?actor_caregiver_id=2").status_code == 403
+
+
+def test_activity_log_delete_authorizes_through_parent_routine(client: TestClient) -> None:
+    routine = client.post(
+        "/api/lifestyle/activities/routines",
+        json={"patient_id": 1, "actor_caregiver_id": 1, "name": "Delete test routine", "activity_type": "Exercise"},
+    )
+    assert routine.status_code == 200
+    log = client.post(
+        f"/api/lifestyle/activities/routines/{routine.json()['id']}/logs",
+        json={"actor_caregiver_id": 1, "log_date": "2026-11-06", "completed": True},
+    )
+    assert log.status_code == 200
+    log_id = log.json()["id"]
+    assert client.delete(f"/api/lifestyle/activities/logs/{log_id}?actor_caregiver_id=1").status_code == 200
+    assert client.delete(f"/api/lifestyle/activities/logs/{log_id}?actor_caregiver_id=1").status_code == 404

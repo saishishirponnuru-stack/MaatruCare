@@ -6,41 +6,16 @@ import { useState } from "react";
 import {
   Check,
   CheckCircle2,
-  ChevronRight,
   Mail,
+  MoreHorizontal,
+  RotateCcw,
   ShieldCheck,
   UserPlus,
   Users,
   X,
 } from "lucide-react";
-import { useMaatruCareDemo } from "@/context/MaatruCareDemoContext";
-
-const caregivers = [
-  {
-    name: "Rahul Rao",
-    relation: "Partner",
-    role: "Primary caregiver",
-    access: "Care coordination",
-    initials: "RR",
-    status: "Sample",
-  },
-  {
-    name: "Lakshmi Rao",
-    relation: "Mother",
-    role: "Family caregiver",
-    access: "Appointments & tasks",
-    initials: "LR",
-    status: "Sample",
-  },
-  {
-    name: "Priya Rao",
-    relation: "Sister",
-    role: "Support caregiver",
-    access: "Selected updates",
-    initials: "PR",
-    status: "Sample",
-  },
-] as const;
+import { useMaatruCareDemo, type DemoOwner } from "@/context/MaatruCareDemoContext";
+import type { ApiCaregiver } from "@/lib/api";
 
 const permissionKeys = [
   "Appointments",
@@ -49,17 +24,35 @@ const permissionKeys = [
   "Approved care updates",
 ] as const;
 
-type Caregiver = (typeof caregivers)[number];
 type PermissionKey = (typeof permissionKeys)[number];
 
 
 export default function CareCirclePage() {
-  const { permissions, updateConsentPermission } = useMaatruCareDemo();
-  const [selectedCaregiver, setSelectedCaregiver] =
-    useState<Caregiver | null>(null);
+  const { permissions, updateConsentPermission, caregiverRecords, removeCaregiver } = useMaatruCareDemo();
+  const [selectedCaregiver, setSelectedCaregiver] = useState<ApiCaregiver | null>(null);
   const [feedback, setFeedback] = useState("");
   const [pendingPermission, setPendingPermission] =
     useState<PermissionKey | null>(null);
+  const [removing, setRemoving] = useState(false);
+
+  function initials(name: string) {
+    return name.split(/\s+/).map((part) => part[0] ?? "").join("").slice(0, 2).toUpperCase();
+  }
+
+  async function removeSelectedCaregiver() {
+    if (!selectedCaregiver || removing || selectedCaregiver.relationship === "Primary caregiver") return;
+    if (!window.confirm(`Remove ${selectedCaregiver.name} from this patient's Care Circle? Their patient-specific access will be revoked; their global account, if any, is not deleted.`)) return;
+    setRemoving(true);
+    try {
+      await removeCaregiver(selectedCaregiver.id);
+      setSelectedCaregiver(null);
+      setFeedback(`${selectedCaregiver.name} was removed from the Care Circle.`);
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : "Caregiver removal is unavailable.");
+    } finally {
+      setRemoving(false);
+    }
+  }
   return (
     <AppShell>
       <div>
@@ -84,7 +77,7 @@ export default function CareCirclePage() {
             whileHover={{ y: -1 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => {
-              setFeedback("Demo only — no invitation email is sent and no new account is created.");
+              setFeedback("Invitations are not available in this workspace.");
               window.setTimeout(() => setFeedback(""), 2600);
             }}
             className="flex items-center justify-center gap-2 rounded-[13px] bg-[#6D3A5B] px-4 py-2.5 text-xs font-semibold text-white shadow-sm"
@@ -133,18 +126,18 @@ export default function CareCirclePage() {
               </h2>
 
               <p className="mt-1 text-[11px] text-[#9A9196]">
-                3 fictional demo profiles
+                {caregiverRecords.length} care team member{caregiverRecords.length === 1 ? "" : "s"}
               </p>
             </div>
 
             <div className="flex items-center gap-1.5 text-[10px] font-medium text-[#4F8068]">
               <CheckCircle2 size={13} />
-              Demo profiles
+              Care team
             </div>
           </div>
 
           <div className="space-y-3">
-            {caregivers.map((caregiver, index) => (
+            {caregiverRecords.map((caregiver, index) => (
               <motion.div
                 key={caregiver.name}
                 initial={{ opacity: 0, y: 8 }}
@@ -155,7 +148,7 @@ export default function CareCirclePage() {
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
                   {/* Avatar */}
                   <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#F0E5EB] text-xs font-semibold text-[#6D3A5B]">
-                    {caregiver.initials}
+                    {initials(caregiver.name)}
                   </div>
 
                   {/* Person */}
@@ -166,12 +159,12 @@ export default function CareCirclePage() {
                       </h3>
 
                       <span className="rounded-full bg-[#F5F1F3] px-2 py-1 text-[9px] font-medium text-[#756D72]">
-                        {caregiver.relation}
+                        {caregiver.relationship}
                       </span>
                     </div>
 
                     <p className="mt-1 text-[10px] text-[#9A9196]">
-                      {caregiver.role}
+                      {caregiver.access_status}
                     </p>
                   </div>
 
@@ -182,7 +175,7 @@ export default function CareCirclePage() {
                     </p>
 
                     <p className="mt-1 text-[11px] font-medium text-[#211C1F]">
-                      {caregiver.access}
+                      {caregiver.access_status === "Active" ? "Patient-approved access" : "Access revoked"}
                     </p>
                   </div>
 
@@ -190,7 +183,7 @@ export default function CareCirclePage() {
                   <div className="flex items-center gap-2">
                     <span className="flex items-center gap-1.5 rounded-full bg-[#EEF5F0] px-2.5 py-1.5 text-[9px] font-semibold text-[#4F8068]">
                       <span className="h-1.5 w-1.5 rounded-full bg-[#4F8068]" />
-                      {caregiver.status}
+                      Active
                     </span>
 
                     <button
@@ -198,7 +191,7 @@ export default function CareCirclePage() {
                       aria-label={`Manage ${caregiver.name}`}
                       className="flex h-8 w-8 items-center justify-center rounded-lg text-[#9A9196] transition hover:bg-[#F7F3F5] hover:text-[#6D3A5B]"
                     >
-                      <ChevronRight size={16} />
+                      <MoreHorizontal size={16} />
                     </button>
                   </div>
                 </div>
@@ -277,7 +270,7 @@ export default function CareCirclePage() {
                   {/* Caregiver identity */}
                   <div className="flex items-center gap-3">
                     <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#F0E5EB] text-sm font-semibold text-[#6D3A5B]">
-                      {selectedCaregiver.initials}
+                      {initials(selectedCaregiver.name)}
                     </div>
 
                     <div>
@@ -286,8 +279,7 @@ export default function CareCirclePage() {
                       </p>
 
                       <p className="mt-1 text-[10px] text-[#9A9196]">
-                        {selectedCaregiver.relation} ·{" "}
-                        {selectedCaregiver.role}
+                        {selectedCaregiver.relationship}
                       </p>
                     </div>
                   </div>
@@ -302,7 +294,7 @@ export default function CareCirclePage() {
                         {permissionKeys.map((permission) => {
                         const caregiverName = selectedCaregiver.name;
                         const enabled =
-                            permissions[caregiverName][permission];
+                            permissions[caregiverName as DemoOwner]?.[permission] ?? false;
 
                         return (
                             <button
@@ -316,7 +308,7 @@ export default function CareCirclePage() {
     setPendingPermission(permission);
     try {
         await updateConsentPermission(
-            caregiverName,
+            caregiverName as DemoOwner,
             permission,
             !enabled
         );
@@ -371,6 +363,21 @@ export default function CareCirclePage() {
                           automatically.
                         </p>
                       </div>
+
+                      {selectedCaregiver.relationship !== "Primary caregiver" && (
+                        <div className="mt-8 border-t border-[#E9E1E4] pt-6">
+                          <button
+                            type="button"
+                            disabled={removing}
+                            onClick={() => void removeSelectedCaregiver()}
+                            className="flex w-full items-center justify-center gap-2 rounded-[12px] border border-[#E7C8CC] py-3 text-xs font-semibold text-[#9D4B55] transition hover:bg-[#FFF5F5] disabled:cursor-wait disabled:opacity-60"
+                          >
+                            <RotateCcw size={14} />
+                            {removing ? "Removing access…" : `Remove ${selectedCaregiver.name}`}
+                          </button>
+                          <p className="mt-2 text-[10px] leading-4 text-[#9A9196]">This revokes this patient-specific relationship and preserves access history. It does not delete a global account.</p>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -389,11 +396,11 @@ export default function CareCirclePage() {
 
                         <div>
                           <p className="text-[11px] font-semibold text-[#211C1F]">
-                            Illustrative permission state
+                            Permission state
                           </p>
 
                           <p className="mt-1 text-[10px] leading-4 text-[#9A9196]">
-                            This activity history is illustrative demo content.
+                            Activity history is retained for continuity and review.
                           </p>
                         </div>
                       </div>

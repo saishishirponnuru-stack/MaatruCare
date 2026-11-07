@@ -70,14 +70,14 @@ export default function HandoffsPage() {
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9A9196]">Care coordination</p>
             <h1 className="mt-2 text-3xl font-semibold tracking-[-0.03em] text-[#211C1F]">Care handoffs</h1>
-            <p className="mt-2 max-w-xl text-sm leading-6 text-[#756D72]">Track backend-supported responsibility handoffs between configured demo caregivers.</p>
+            <p className="mt-2 max-w-xl text-sm leading-6 text-[#756D72]">Track responsibility handoffs between members of your care team.</p>
           </div>
           <button type="button" onClick={() => setModal("create")} className="flex items-center justify-center gap-2 rounded-[13px] bg-[#6D3A5B] px-4 py-2.5 text-xs font-semibold text-white"><Plus size={15} />Create handoff</button>
         </header>
 
         <div className="mt-6 flex gap-4 rounded-[20px] border border-[#E4D7DF] bg-[#F8F2F6] p-5">
           <ShieldCheck size={19} className="mt-0.5 shrink-0 text-[#6D3A5B]" />
-          <p className="self-center text-xs leading-5 text-[#756D72]">This screen shows synthetic handoff records. The backend stores participants, reason, status, and timestamps; it does not attach appointment/task details or implement a request-changes action. Permission checks remain server-enforced.</p>
+          <p className="self-center text-xs leading-5 text-[#756D72]">Handoffs record participants, reason, status, and timestamps. Permission checks remain server-enforced.</p>
         </div>
 
         {toast && <div role="status" className="mt-5 rounded-[12px] border border-[#CFE0D5] bg-[#F1F8F3] px-3 py-2 text-xs font-medium text-[#3F6D56]">{toast}</div>}
@@ -100,13 +100,13 @@ export default function HandoffsPage() {
           <div className="space-y-6">
             <section className="rounded-[18px] border border-[#E4D7DF] bg-[#F8F2F6] p-5">
               <div className="flex items-center gap-3"><ShieldCheck size={18} className="text-[#6D3A5B]" /><h2 className="text-sm font-semibold text-[#211C1F]">Sharing permissions</h2></div>
-              <p className="mt-3 text-[11px] leading-5 text-[#756D72]">Backend permission checks remain authoritative. This screen does not grant access by displaying illustrative labels.</p>
+              <p className="mt-3 text-[11px] leading-5 text-[#756D72]">Backend permission checks remain authoritative. This screen does not grant access by displaying labels.</p>
               <div className="mt-4 flex flex-wrap gap-3 text-[10px] font-semibold text-[#6D3A5B]"><Link href="/consent">Review Consent</Link><Link href="/care-circle">View Care Circle</Link><Link href="/timeline">View Timeline</Link></div>
             </section>
             <section className="rounded-[18px] border border-[#E9E1E4] bg-white p-5">
               <div className="flex items-center gap-3"><Clock3 size={17} className="text-[#6D3A5B]" /><h2 className="text-sm font-semibold text-[#211C1F]">Care Handoff Lag</h2></div>
-              <p className="mt-3 text-[11px] leading-5 text-[#756D72]">Time between responsibility changing and receiving-caregiver acknowledgement. This demo has no validated performance result.</p>
-              <span className="mt-3 inline-block rounded-full bg-[#FBF8F7] px-2.5 py-1 text-[9px] font-semibold text-[#9A9196]">Synthetic example · no metric available</span>
+              <p className="mt-3 text-[11px] leading-5 text-[#756D72]">Time between responsibility changing and receiving-caregiver acknowledgement.</p>
+              <span className="mt-3 inline-block rounded-full bg-[#FBF8F7] px-2.5 py-1 text-[9px] font-semibold text-[#9A9196]">Metric available after acknowledgement</span>
             </section>
           </div>
         </div>

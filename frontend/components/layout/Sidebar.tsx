@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   Home,
@@ -12,7 +13,6 @@ import {
   ShieldCheck,
   Activity,
   Settings,
-  HeartPulse,
   X,
 } from "lucide-react";
 import { motion } from "framer-motion";
@@ -55,20 +55,16 @@ export default function Sidebar({
         <Link
           href="/dashboard"
           onClick={handleNavigate}
-          className="flex items-center gap-3"
+          className="flex min-w-0 items-center"
         >
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-[#6D3A5B] text-white shadow-sm">
-            <HeartPulse size={21} strokeWidth={2.2} />
-          </div>
-
-          <div>
-            <div className="text-[18px] font-semibold tracking-[-0.02em] text-[var(--mc-text)]">
-              MaatruCare
-            </div>
-            <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-[var(--mc-muted)]">
-              Care together
-            </div>
-          </div>
+          <Image
+            src="/maatru-care-logo.webp"
+            alt="MaatruCare — Care together"
+            width={1818}
+            height={590}
+            priority
+            className="mc-brand-logo h-auto w-[184px] max-w-full"
+          />
         </Link>
 
         <button
@@ -137,7 +133,7 @@ export default function Sidebar({
           <div className="flex items-center gap-2">
             <div className="h-2 w-2 shrink-0 rounded-full bg-[#9A9196]" />
             <span className="text-[11px] font-medium text-[var(--mc-muted)]">
-              Synthetic demo · no sign-in
+              Patient-controlled care
             </span>
           </div>
         </div>

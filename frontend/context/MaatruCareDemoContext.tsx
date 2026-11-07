@@ -125,6 +125,7 @@ export type MaatruCareDemoContextValue = {
   ) => Promise<void>;
 
   completeTask: (id: string) => Promise<void>;
+  deleteTask: (id: string) => Promise<void>;
 
   reassignTask: (
     id: string,
@@ -150,6 +151,8 @@ export type MaatruCareDemoContextValue = {
     permission: PermissionName,
     enabled: boolean
   ) => Promise<void>;
+  caregiverRecords: ApiCaregiver[];
+  removeCaregiver: (id: number) => Promise<void>;
 };
 
 const DemoContext =
@@ -359,7 +362,7 @@ export function MaatruCareDemoProvider({
         api.getCaregivers(),
         api.getTasks(),
         api.getHandoffs(),
-        api.getTimeline(),
+        api.getTimeline(15, 0),
         api.getPermissions(),
       ]);
 
@@ -521,7 +524,7 @@ export function MaatruCareDemoProvider({
       ...previous.filter((item) => item.id !== newTask.id),
     ]);
 
-    void api.getTimeline()
+    void api.getTimeline(15, 0)
       .then((events) => {
         setTimeline(events.map(mapTimelineEvent));
       })
@@ -558,7 +561,7 @@ export function MaatruCareDemoProvider({
         actor_caregiver_id: DEMO_ACTOR_CAREGIVER_ID,
       });
 
-      void api.getTimeline()
+      void api.getTimeline(15, 0)
         .then((events) => setTimeline(events.map(mapTimelineEvent)))
         .catch((error) => {
           console.warn("Timeline refresh failed:", error);
@@ -594,7 +597,7 @@ export function MaatruCareDemoProvider({
     try {
       await api.completeTask(Number(id), completed);
 
-      void api.getTimeline()
+      void api.getTimeline(15, 0)
         .then((events) => setTimeline(events.map(mapTimelineEvent)))
         .catch((error) => {
           console.warn("Timeline refresh failed:", error);
@@ -610,6 +613,28 @@ export function MaatruCareDemoProvider({
 
       throw error;
     }
+  }
+
+  async function deleteTask(id: string) {
+    const previous = tasks;
+    const task = tasks.find((item) => item.id === id);
+    if (!task) throw new Error("Task not found.");
+    setTasks((current) => current.filter((item) => item.id !== id));
+    try {
+      await api.deleteTask(Number(id));
+      void api.getTimeline(15, 0)
+        .then((events) => setTimeline(events.map(mapTimelineEvent)))
+        .catch((error) => console.warn("Timeline refresh failed:", error));
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) return;
+      setTasks(previous);
+      throw error;
+    }
+  }
+
+  async function removeCaregiver(id: number) {
+    await api.removeCaregiver(id);
+    await refresh();
   }
 
   async function reassignTask(
@@ -636,7 +661,7 @@ export function MaatruCareDemoProvider({
         actor_caregiver_id: DEMO_ACTOR_CAREGIVER_ID,
       });
 
-      void api.getTimeline()
+      void api.getTimeline(15, 0)
         .then((events) => setTimeline(events.map(mapTimelineEvent)))
         .catch((error) => {
           console.warn("Timeline refresh failed:", error);
@@ -690,7 +715,7 @@ export function MaatruCareDemoProvider({
       ...previous.filter((item) => item.id !== newHandoff.id),
     ]);
 
-    void api.getTimeline()
+    void api.getTimeline(15, 0)
       .then((events) => setTimeline(events.map(mapTimelineEvent)))
       .catch((error) => {
         console.warn("Timeline refresh failed:", error);
@@ -718,7 +743,7 @@ export function MaatruCareDemoProvider({
     try {
       await api.sendHandoff(Number(id));
 
-      void api.getTimeline()
+      void api.getTimeline(15, 0)
         .then((events) => setTimeline(events.map(mapTimelineEvent)))
         .catch((error) => {
           console.warn("Timeline refresh failed:", error);
@@ -759,7 +784,7 @@ export function MaatruCareDemoProvider({
         caregiverIdFor(handoff.to)
       );
 
-      void api.getTimeline()
+      void api.getTimeline(15, 0)
         .then((events) => setTimeline(events.map(mapTimelineEvent)))
         .catch((error) => {
           console.warn("Timeline refresh failed:", error);
@@ -800,7 +825,7 @@ export function MaatruCareDemoProvider({
         caregiverIdFor(handoff.to)
       );
 
-      void api.getTimeline()
+      void api.getTimeline(15, 0)
         .then((events) => setTimeline(events.map(mapTimelineEvent)))
         .catch((error) => {
           console.warn("Timeline refresh failed:", error);
@@ -851,7 +876,7 @@ export function MaatruCareDemoProvider({
           DEMO_ACTOR_CAREGIVER_ID,
       });
 
-      void api.getTimeline()
+      void api.getTimeline(15, 0)
         .then((events) => setTimeline(events.map(mapTimelineEvent)))
         .catch((error) => {
           console.warn("Timeline refresh failed:", error);
@@ -884,6 +909,7 @@ export function MaatruCareDemoProvider({
       addTask,
       updateTask,
       completeTask,
+      deleteTask,
       reassignTask,
       createHandoff,
       sendHandoff,
@@ -894,6 +920,8 @@ export function MaatruCareDemoProvider({
           "Timeline events are recorded by backend mutations."
         ),
       updateConsentPermission,
+      caregiverRecords,
+      removeCaregiver,
   };
   return (
     <DemoContext.Provider value={value}>

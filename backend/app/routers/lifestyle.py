@@ -126,6 +126,24 @@ def delete_water(record_id: int, actor_caregiver_id: int = 1, db: Session = Depe
     return {"deleted": True}
 
 
+def delete_lifestyle_record(record, actor_caregiver_id: int, db: Session):
+    if record is None:
+        raise HTTPException(404, "Lifestyle record not found")
+    access(db, actor_caregiver_id, record.patient_id, True)
+    try:
+        db.delete(record)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return {"deleted": True}
+
+
+@router.delete("/sleep/{record_id}")
+def delete_sleep(record_id: int, actor_caregiver_id: int = 1, db: Session = Depends(get_db)):
+    return delete_lifestyle_record(db.get(SleepLog, record_id), actor_caregiver_id, db)
+
+
 @router.post("/sleep")
 def create_sleep(payload: SleepCreate, db: Session = Depends(get_db)):
     access(db, payload.actor_caregiver_id, payload.patient_id, True)
@@ -186,6 +204,24 @@ def update_adherence(record_id: int, payload: DietAdherenceCreate, db: Session =
     return save(db, record)
 
 
+@router.delete("/diet/adherence/{record_id}")
+def delete_adherence(record_id: int, actor_caregiver_id: int = 1, db: Session = Depends(get_db)):
+    record = db.get(DietAdherence, record_id)
+    if record is None:
+        raise HTTPException(404, "Diet adherence record not found")
+    recommendation = db.get(DietRecommendation, record.recommendation_id)
+    if recommendation is None:
+        raise HTTPException(404, "Diet recommendation not found")
+    access(db, actor_caregiver_id, recommendation.patient_id, True)
+    try:
+        db.delete(record)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return {"deleted": True}
+
+
 @router.post("/activities/routines")
 def create_routine(payload: ActivityRoutineCreate, db: Session = Depends(get_db)):
     access(db, payload.actor_caregiver_id, payload.patient_id, True)
@@ -200,6 +236,16 @@ def update_routine(record_id: int, payload: ActivityRoutineCreate, db: Session =
     access(db, payload.actor_caregiver_id, record.patient_id, True)
     for key, value in payload.model_dump(exclude={"actor_caregiver_id", "patient_id"}).items():
         setattr(record, key, value)
+    return save(db, record)
+
+
+@router.delete("/activities/routines/{record_id}")
+def archive_routine(record_id: int, actor_caregiver_id: int = 1, db: Session = Depends(get_db)):
+    record = db.get(ActivityRoutine, record_id)
+    if record is None:
+        raise HTTPException(404, "Activity routine not found")
+    access(db, actor_caregiver_id, record.patient_id, True)
+    record.active = False
     return save(db, record)
 
 
@@ -230,6 +276,24 @@ def update_activity_log(record_id: int, payload: ActivityLogCreate, db: Session 
     return save(db, record)
 
 
+@router.delete("/activities/logs/{record_id}")
+def delete_activity_log(record_id: int, actor_caregiver_id: int = 1, db: Session = Depends(get_db)):
+    record = db.get(ActivityLog, record_id)
+    if record is None:
+        raise HTTPException(404, "Activity log not found")
+    routine = db.get(ActivityRoutine, record.routine_id)
+    if routine is None:
+        raise HTTPException(404, "Activity routine not found")
+    access(db, actor_caregiver_id, routine.patient_id, True)
+    try:
+        db.delete(record)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return {"deleted": True}
+
+
 @router.put("/preferences")
 def update_preferences(payload: LifestylePreferenceUpdate, db: Session = Depends(get_db)):
     access(db, payload.actor_caregiver_id, payload.patient_id, True)
@@ -257,3 +321,8 @@ def update_weight(record_id: int, payload: WeightCreate, db: Session = Depends(g
     for key, value in payload.model_dump(exclude={"actor_caregiver_id", "patient_id"}).items():
         setattr(record, key, value)
     return save(db, record)
+
+
+@router.delete("/weight/{record_id}")
+def delete_weight(record_id: int, actor_caregiver_id: int = 1, db: Session = Depends(get_db)):
+    return delete_lifestyle_record(db.get(WeightEntry, record_id), actor_caregiver_id, db)

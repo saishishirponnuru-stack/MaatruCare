@@ -168,7 +168,7 @@ export default function AIAssistPage() {
             <Sparkles size={19} />
           </div>
           <p className="self-center max-w-3xl text-xs leading-5 text-[#756D72]">
-            MaatruCare AI drafts summaries and suggested tasks from fictional coordination notes. A person must review the output; this demo does not share information.
+            MaatruCare AI drafts summaries and suggested tasks from coordination notes. A person must review the output; this workflow does not share information.
           </p>
         </motion.div>
 
@@ -198,14 +198,14 @@ export default function AIAssistPage() {
           <div className="rounded-[22px] border border-[#E9E1E4] bg-white p-6 shadow-[0_8px_30px_rgba(33,28,31,0.035)]">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9A9196]">Demo assistive workflow</p>
-                <h2 className="mt-1 text-[17px] font-semibold tracking-[-0.02em] text-[#211C1F]">Review synthetic information</h2>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9A9196]">Assistive workflow</p>
+                <h2 className="mt-1 text-[17px] font-semibold tracking-[-0.02em] text-[#211C1F]">Review information</h2>
               </div>
               <div className="flex h-9 w-9 items-center justify-center rounded-[11px] bg-[#FBF8F7] text-[#6D3A5B]"><FileText size={17} /></div>
             </div>
 
             <div className="mt-6 space-y-5">
-              <DemoField label="Scenario" value="Fictional transport plan" />
+              <DemoField label="Scenario" value="Transport coordination" />
               <DemoField label="Processing" value="Server-side screening and summary" />
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9A9196]">Fictional, non-clinical coordination note</p>
@@ -255,7 +255,7 @@ export default function AIAssistPage() {
               <div className="mt-6 flex min-h-[250px] flex-col items-center justify-center rounded-[16px] border border-dashed border-[#DCCBD5] bg-[#FFFCFB] px-6 text-center">
                 <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#F3EAF0] text-[#6D3A5B]"><Sparkles size={19} /></div>
                 <p className="mt-4 text-sm font-semibold text-[#211C1F]">Ready for a human-reviewed draft</p>
-                <p className="mt-2 max-w-sm text-[11px] leading-5 text-[#9A9196]">Prepare a draft from the fictional coordination note. Nothing is saved or shared by this workflow.</p>
+                <p className="mt-2 max-w-sm text-[11px] leading-5 text-[#9A9196]">Prepare a draft from the coordination note. Nothing is saved or shared by this workflow.</p>
               </div>
             )}
 
@@ -307,7 +307,7 @@ export default function AIAssistPage() {
         {draftState === "approved" && (
           <section className="mt-6 rounded-[20px] border border-[#CFE0D5] bg-[#F1F8F3] p-5 sm:p-6">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex gap-3"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-[#E0EFE4] text-[#4F8068]"><ShieldCheck size={19} /></div><div><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#4F8068]">Local demo state</p><h2 className="mt-1 text-sm font-semibold text-[#211C1F]">A reviewer marked this draft ready</h2><p className="mt-2 max-w-2xl text-xs leading-5 text-[#5D7064]">This action changes only the current screen. It does not save an audit record or share information.</p></div></div>
+              <div className="flex gap-3"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-[#E0EFE4] text-[#4F8068]"><ShieldCheck size={19} /></div><div><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#4F8068]">Review state</p><h2 className="mt-1 text-sm font-semibold text-[#211C1F]">A reviewer marked this draft ready</h2><p className="mt-2 max-w-2xl text-xs leading-5 text-[#5D7064]">This action changes only the current screen. It does not save an audit record or share information.</p></div></div>
               <div className="flex flex-col gap-2 sm:flex-row lg:shrink-0"><ControlLink href="/consent" label="Review consent" /><ControlLink href="/care-circle" label="Care Circle" /></div>
             </div>
           </section>
@@ -321,11 +321,11 @@ export default function AIAssistPage() {
 
           <section className="rounded-[20px] border border-[#E9E1E4] bg-white p-6 shadow-[0_8px_30px_rgba(33,28,31,0.025)]">
             <div className="flex items-start gap-3"><div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px] bg-[#FBF8F7] text-[#6D3A5B]"><History size={17} /></div><div><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9A9196]">Audit trail</p><h2 className="mt-1 text-[17px] font-semibold text-[#211C1F]">Review activity</h2></div></div>
-            {draftState === "approved" ? <div className="mt-5 rounded-[14px] border border-[#CFE0D5] bg-[#F1F8F3] p-4"><div className="flex items-start gap-3"><div className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-[#E0EFE4] text-[#4F8068]"><CheckCircle2 size={16} /></div><div className="min-w-0 flex-1"><p className="text-xs font-semibold text-[#211C1F]">Review state changed in this browser session</p><p className="mt-2 text-[10px] leading-4 text-[#756D72]">No backend audit entry is created and no information is shared.</p></div></div></div> : <div className="mt-5 rounded-[14px] bg-[#FBF8F7] p-4 text-[11px] leading-5 text-[#9A9196]">Review decisions are local demo state only; this workflow does not write an audit event.</div>}
+            {draftState === "approved" ? <div className="mt-5 rounded-[14px] border border-[#CFE0D5] bg-[#F1F8F3] p-4"><div className="flex items-start gap-3"><div className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-[#E0EFE4] text-[#4F8068]"><CheckCircle2 size={16} /></div><div className="min-w-0 flex-1"><p className="text-xs font-semibold text-[#211C1F]">Review state changed in this browser session</p><p className="mt-2 text-[10px] leading-4 text-[#756D72]">No backend audit entry is created and no information is shared.</p></div></div></div> : <div className="mt-5 rounded-[14px] bg-[#FBF8F7] p-4 text-[11px] leading-5 text-[#9A9196]">Review decisions are local workflow state only; this workflow does not write an audit event.</div>}
           </section>
         </div>
 
-        <div className="mt-6 flex gap-3 rounded-[16px] bg-[#FBF8F7] p-4"><ShieldCheck size={16} className="mt-0.5 shrink-0 text-[#6D3A5B]" /><p className="text-[11px] leading-5 text-[#756D72]">This is a synthetic demonstration of an assistive workflow. A person remains responsible for reviewing and deciding what can be shared.</p></div>
+        <div className="mt-6 flex gap-3 rounded-[16px] bg-[#FBF8F7] p-4"><ShieldCheck size={16} className="mt-0.5 shrink-0 text-[#6D3A5B]" /><p className="text-[11px] leading-5 text-[#756D72]">This assistive workflow requires human review. A person remains responsible for reviewing and deciding what can be shared.</p></div>
       </div>
     </AppShell>
   );
@@ -348,11 +348,11 @@ function ReviewPanel({ onApprove, onEdit, onReject }: { onApprove: () => void; o
 }
 
 function ApprovedState() {
-  return <div className="mt-6 flex items-center gap-3 rounded-[14px] border border-[#CFE0D5] bg-[#F1F8F3] p-4"><CheckCircle2 size={18} className="shrink-0 text-[#4F8068]" /><div><p className="text-xs font-semibold text-[#211C1F]">Marked reviewed for this demo</p><p className="mt-1 text-[10px] leading-4 text-[#5D7064]">This local state does not share information or persist an approval.</p></div></div>;
+  return <div className="mt-6 flex items-center gap-3 rounded-[14px] border border-[#CFE0D5] bg-[#F1F8F3] p-4"><CheckCircle2 size={18} className="shrink-0 text-[#4F8068]" /><div><p className="text-xs font-semibold text-[#211C1F]">Marked reviewed</p><p className="mt-1 text-[10px] leading-4 text-[#5D7064]">This local state does not share information or persist an approval.</p></div></div>;
 }
 
 function RejectedState({ onPrepare }: { onPrepare: () => void }) {
-  return <div className="mt-6 rounded-[14px] border border-[#E7D2D2] bg-[#FFF5F4] p-4"><p className="text-xs font-semibold text-[#8D4B50]">Draft rejected - nothing was shared</p><button type="button" onClick={onPrepare} className="mt-3 flex items-center gap-1.5 text-[10px] font-semibold text-[#6D3A5B]">Prepare another demo draft <ArrowRight size={13} /></button></div>;
+  return <div className="mt-6 rounded-[14px] border border-[#E7D2D2] bg-[#FFF5F4] p-4"><p className="text-xs font-semibold text-[#8D4B50]">Draft rejected - nothing was shared</p><button type="button" onClick={onPrepare} className="mt-3 flex items-center gap-1.5 text-[10px] font-semibold text-[#6D3A5B]">Prepare another draft <ArrowRight size={13} /></button></div>;
 }
 
 function ControlLink({ href, label }: { href: string; label: string }) {

@@ -14,7 +14,10 @@ import {
   UserRound,
   Users,
 } from "lucide-react";
-import { useMaatruCareDemo } from "@/context/MaatruCareDemoContext";
+import { useMaatruCareDemo, type DemoTimelineEvent } from "@/context/MaatruCareDemoContext";
+import { api } from "@/lib/api";
+
+const TIMELINE_PAGE_SIZE = 15;
 
 const filters = [
   "All",
@@ -63,9 +66,17 @@ function formatDate(date: string) {
 export default function TimelinePage() {
   const { timeline } = useMaatruCareDemo();
   const [filter, setFilter] = useState<Filter>("All");
+  const [additionalEvents, setAdditionalEvents] = useState<DemoTimelineEvent[]>([]);
+  const [hasMoreOverride, setHasMoreOverride] = useState<boolean | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const events = useMemo(() => {
+    const merged = new Map([...timeline, ...additionalEvents].map((event) => [event.id, event]));
+    return Array.from(merged.values());
+  }, [additionalEvents, timeline]);
+  const hasMore = hasMoreOverride ?? timeline.length === TIMELINE_PAGE_SIZE;
 
   const visibleEvents = useMemo(() => {
-    const sharedEvents: TimelineEvent[] = timeline.map((event) => {
+    const sharedEvents: TimelineEvent[] = events.map((event) => {
       const title = event.title.toLowerCase();
       const validTypes: EventType[] = ["Appointment", "Care update", "Coordination", "Task"];
       const type = validTypes.includes(event.eventType as EventType)
@@ -86,11 +97,37 @@ export default function TimelinePage() {
       };
     });
 
-    return sharedEvents.filter((event) => {
+    return sharedEvents
+      .sort((a, b) => b.date.localeCompare(a.date) || Number(b.id) - Number(a.id))
+      .filter((event) => {
       if (filter === "All") return true;
       return event.type === filterToType[filter];
-    });
-  }, [filter, timeline]);
+      });
+  }, [events, filter]);
+
+  async function loadMore() {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      const next = await api.getTimeline(TIMELINE_PAGE_SIZE, events.length);
+      setAdditionalEvents((current) => {
+        const merged = new Map(current.map((event) => [event.id, event]));
+        next.forEach((event) => merged.set(String(event.id), {
+          id: String(event.id),
+          title: event.title,
+          description: event.description ?? event.event_type,
+          time: new Date(event.event_date).toLocaleDateString("en-GB", { day: "numeric", month: "short" }),
+          eventDate: String(event.event_date).slice(0, 10),
+          eventType: event.event_type,
+          source: event.source ?? undefined,
+        }));
+        return Array.from(merged.values());
+      });
+      setHasMoreOverride(next.length === TIMELINE_PAGE_SIZE);
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   return (
     <AppShell>
@@ -118,10 +155,6 @@ export default function TimelinePage() {
               Circle.
             </span>
           </div>
-        </div>
-
-        <div role="note" className="mt-8 rounded-[14px] border border-[#E9E1E4] bg-[#FBF8F7] px-4 py-3 text-[11px] leading-5 text-[#756D72]">
-          Journey-phase filtering is unavailable because timeline records do not include a verified phase field. Event-type filters below use the event data returned by the backend.
         </div>
 
         <div className="mt-6 flex flex-wrap gap-2">
@@ -168,7 +201,7 @@ export default function TimelinePage() {
                 No events in this view
               </p>
               <p className="mt-2 text-xs leading-5 text-[#756D72]">
-                Phase-specific events require a verified care-phase assignment. Select All phases to view recorded activity.
+                Try another event filter or check back after more coordination activity is recorded.
               </p>
             </div>
           ) : (
@@ -281,6 +314,13 @@ export default function TimelinePage() {
               </div>
             </div>
           )}
+          {visibleEvents.length > 0 && hasMore ? (
+            <div className="mt-6 flex justify-center border-t border-[#F0E9EC] pt-5">
+              <button type="button" onClick={() => void loadMore()} disabled={loadingMore} className="rounded-[12px] border border-[#E9E1E4] bg-white px-4 py-2.5 text-xs font-semibold text-[#6D3A5B] transition hover:bg-[#FBF8F7] disabled:cursor-wait disabled:opacity-60">
+                {loadingMore ? "Loading history…" : "Load more"}
+              </button>
+            </div>
+          ) : null}
         </section>
 
         <section className="mt-8 rounded-[20px] border border-[#E4D7DF] bg-[#F8F2F6] p-5">
@@ -298,7 +338,3 @@ export default function TimelinePage() {
     </AppShell>
   );
 }
-
-
-
-

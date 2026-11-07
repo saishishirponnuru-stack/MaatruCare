@@ -13,6 +13,8 @@ router = APIRouter(prefix="/api/timeline", tags=["timeline"])
 @router.get("", response_model=list[TimelineEventResponse])
 def list_timeline_events(
 	actor_caregiver_id: int = Query(...),
+	limit: int = Query(15, ge=1, le=100),
+	offset: int = Query(0, ge=0),
 	db: Session = Depends(get_db),
 ) -> list[TimelineEvent]:
 	actor = get_active_caregiver(db, actor_caregiver_id)
@@ -21,6 +23,8 @@ def list_timeline_events(
 		db.scalars(
 			select(TimelineEvent)
 			.where(TimelineEvent.patient_id == actor.patient_id)
-			.order_by(TimelineEvent.event_date, TimelineEvent.id)
+			.order_by(TimelineEvent.event_date.desc(), TimelineEvent.id.desc())
+			.offset(offset)
+			.limit(limit)
 		).all()
 	)

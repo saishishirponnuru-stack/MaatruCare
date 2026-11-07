@@ -111,3 +111,34 @@ def complete_task(task_id: int, payload: TaskCompletion, db: Session = Depends(g
 		db.rollback()
 		raise
 	return task
+
+
+@router.delete("/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_task(task_id: int, payload: TaskCompletion, db: Session = Depends(get_db)) -> None:
+	task = db.get(Task, task_id)
+	if task is None:
+		raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
+	actor = require_patient_caregiver(db, payload.actor_caregiver_id, task.patient_id)
+	require_permission(db, actor, "Coordination tasks")
+	try:
+		record_audit(
+			db,
+			patient_id=task.patient_id,
+			actor_name=actor.name,
+			action="task_deleted",
+			resource_type="Task",
+			resource_id=task.id,
+		)
+		record_timeline_event(
+			db,
+			patient_id=task.patient_id,
+			event_type="Task",
+			title="Task removed",
+			description=f'Task "{task.title}" was removed from current responsibilities.',
+			source="Coordination task",
+		)
+		db.delete(task)
+		db.commit()
+	except Exception:
+		db.rollback()
+		raise
