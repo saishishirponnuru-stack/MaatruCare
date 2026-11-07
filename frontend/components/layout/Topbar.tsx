@@ -7,6 +7,8 @@ import { Menu, Moon, Sun, UserRound, X } from "lucide-react";
 import { motion } from "framer-motion";
 import type { RefObject } from "react";
 import { usePreferences } from "@/context/PreferencesContext";
+import { useAuth } from "@/context/AuthContext";
+import SignOutButton from "@/components/auth/SignOutButton";
 
 interface TopbarProps {
   onMenu?: () => void;
@@ -25,6 +27,7 @@ const pageTitles: Array<[string, string]> = [
   ["/appointments", "Appointments"],
   ["/ai-assist", "AI Assist"],
   ["/profile", "Profile"],
+  ["/lifestyle", "Lifestyle"],
   ["/settings", "Settings"],
 ];
 
@@ -35,6 +38,7 @@ export default function Topbar({
 }: TopbarProps) {
   const pathname = usePathname();
   const { theme, toggleTheme, reducedMotion } = usePreferences();
+  const { account } = useAuth();
   const title = pageTitles.find(([path]) => pathname === path || pathname.startsWith(`${path}/`))?.[1] ?? "Care coordination";
 
   return (
@@ -71,7 +75,7 @@ export default function Topbar({
         </Link>
 
         <div className="hidden min-w-0 lg:block">
-          <p className="truncate text-[10px] font-medium text-[var(--mc-muted)]">Patient-controlled care</p>
+
           <p className="truncate text-[16px] font-semibold tracking-[-0.02em] text-[var(--mc-text)]">{title}</p>
         </div>
       </div>
@@ -91,8 +95,9 @@ export default function Topbar({
         </motion.button>
         <Link href="/profile" aria-label="View care profile" title="View care profile" className="hidden h-10 items-center gap-2 rounded-[11px] border border-[var(--mc-border)] bg-[var(--mc-surface)] px-3 text-xs font-semibold text-[var(--mc-brand)] transition hover:bg-[var(--mc-surface-muted)] lg:flex">
           <UserRound size={16} />
-          Care profile
+          <span className="max-w-36 truncate">{account?.name ?? "Care profile"}</span>
         </Link>
+        <SignOutButton className="hidden h-10 rounded-[11px] border border-[var(--mc-border)] bg-[var(--mc-surface)] px-3 text-xs font-semibold text-[var(--mc-muted)] transition hover:bg-[var(--mc-surface-muted)] lg:block" />
       </div>
     </header>
   );

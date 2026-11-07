@@ -1,7 +1,7 @@
 from sqlalchemy import select
 from fastapi.testclient import TestClient
 
-from app.models import AuditLog
+from app.models import AuditLog, TimelineEvent
 
 
 def test_appointment_create_update_and_cancel(client: TestClient, db_session) -> None:
@@ -28,6 +28,15 @@ def test_appointment_create_update_and_cancel(client: TestClient, db_session) ->
 		select(AuditLog.action).where(AuditLog.resource_type == "Appointment", AuditLog.resource_id == appointment_id).order_by(AuditLog.id)
 	).all()
 	assert actions == ["appointment_created", "appointment_updated", "appointment_cancelled"]
+	timeline_events = db_session.scalars(
+		select(TimelineEvent)
+		.where(TimelineEvent.patient_id == 1, TimelineEvent.source == "Appointment", TimelineEvent.title.in_(["Appointment scheduled", "Appointment updated", "Appointment cancelled"]))
+		.order_by(TimelineEvent.id)
+	).all()
+	assert [event.title for event in timeline_events] == ["Appointment scheduled", "Appointment updated", "Appointment cancelled"]
+	timeline = client.get("/api/timeline?actor_caregiver_id=1")
+	assert timeline.status_code == 200
+	assert {event["title"] for event in timeline.json()} >= {"Appointment scheduled", "Appointment updated", "Appointment cancelled"}
 
 
 def test_appointment_validation_and_permission(client: TestClient) -> None:

@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // An isolated build directory allows browser QA alongside the local dev server.
+  distDir: process.env.MAATRUCARE_BUILD_DIR || ".next",
   reactCompiler: true,
 };
 

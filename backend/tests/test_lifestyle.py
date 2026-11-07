@@ -97,6 +97,10 @@ def test_diet_and_activity_records_can_be_created_and_updated(client: TestClient
         f"/api/lifestyle/activities/logs/{log.json()['id']}",
         json={"actor_caregiver_id": 1, "log_date": "2026-11-06", "completed": True},
     ).status_code == 200
+    assert client.delete(f"/api/lifestyle/diet/adherence/{adherence.json()['id']}").status_code == 422
+    assert client.delete(f"/api/lifestyle/diet/adherence/{adherence.json()['id']}?actor_caregiver_id=1").status_code == 200
+    assert client.delete(f"/api/lifestyle/activities/logs/{log.json()['id']}").status_code == 422
+    assert client.delete(f"/api/lifestyle/activities/logs/{log.json()['id']}?actor_caregiver_id=1").status_code == 200
 
 
 def test_lifestyle_individual_deletes_persist_and_reject_missing_records(client: TestClient) -> None:

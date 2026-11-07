@@ -64,6 +64,18 @@ class DietAdherence(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
 
+class NutritionLog(Base):
+    __tablename__ = "lifestyle_nutrition_logs"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    patient_id: Mapped[int] = mapped_column(ForeignKey("patients.id"), nullable=False, index=True)
+    log_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    meal_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text)
+    recommendation_id: Mapped[int | None] = mapped_column(ForeignKey("lifestyle_diet_recommendations.id"))
+    adherence: Mapped[str | None] = mapped_column(String(30))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
 class ActivityRoutine(Base):
     __tablename__ = "lifestyle_activity_routines"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -84,6 +96,7 @@ class ActivityLog(Base):
     completed: Mapped[bool] = mapped_column(Boolean, nullable=False)
     completion_status: Mapped[str | None] = mapped_column(String(30))
     actual_minutes: Mapped[int | None] = mapped_column(Integer)
+    planned_minutes: Mapped[int | None] = mapped_column(Integer)
     notes: Mapped[str | None] = mapped_column(Text)
     missed_reason: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)

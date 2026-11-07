@@ -1,453 +1,77 @@
 "use client";
 
+import Link from "next/link";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { MoreHorizontal, Plus, UserPlus } from "lucide-react";
 import AppShell from "@/components/layout/AppShell";
-import { AnimatePresence, motion } from "framer-motion";
-import { useState } from "react";
-import {
-  Check,
-  CheckCircle2,
-  Mail,
-  MoreHorizontal,
-  RotateCcw,
-  ShieldCheck,
-  UserPlus,
-  Users,
-  X,
-} from "lucide-react";
-import { useMaatruCareDemo, type DemoOwner } from "@/context/MaatruCareDemoContext";
-import type { ApiCaregiver } from "@/lib/api";
+import { Badge, Button, Drawer, Field, Message, PageHeading, Panel } from "@/components/ui/ProductUI";
+import { api, type ApiCaregiver, type ApiCaregiverInvitation } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
+import { useMaatruCareDemo, type PermissionName } from "@/context/MaatruCareDemoContext";
+import { displayTimestamp } from "@/lib/coordination";
 
-const permissionKeys = [
-  "Appointments",
-  "Coordination tasks",
-  "Care handoffs",
-  "Approved care updates",
-] as const;
-
-type PermissionKey = (typeof permissionKeys)[number];
-
+const categories: PermissionName[] = ["Appointments", "Coordination tasks", "Care handoffs", "Approved care updates"];
+const relationships = ["Partner", "Parent", "Brother", "Sister", "Cousin", "Friend", "Family caregiver", "Support caregiver"];
+const simulatedEnabled = process.env.NEXT_PUBLIC_DEMO_CAREGIVERS_ENABLED === "true";
 
 export default function CareCirclePage() {
-  const { permissions, updateConsentPermission, caregiverRecords, removeCaregiver } = useMaatruCareDemo();
-  const [selectedCaregiver, setSelectedCaregiver] = useState<ApiCaregiver | null>(null);
-  const [feedback, setFeedback] = useState("");
-  const [pendingPermission, setPendingPermission] =
-    useState<PermissionKey | null>(null);
-  const [removing, setRemoving] = useState(false);
-
-  function initials(name: string) {
-    return name.split(/\s+/).map((part) => part[0] ?? "").join("").slice(0, 2).toUpperCase();
+  const { account } = useAuth();
+  const { caregiverRecords, permissions, updateConsentPermission, removeCaregiver, refreshData, loading, error } = useMaatruCareDemo();
+  const canManage = account?.role === "patient";
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [mode, setMode] = useState<"invite" | "simulated" | null>(null);
+  const [invitations, setInvitations] = useState<ApiCaregiverInvitation[]>([]);
+  const [delivery, setDelivery] = useState({ email_available: false, simulated_available: false, explanation: "Create and securely share an invitation link." });
+  const [inviteLoading, setInviteLoading] = useState(true);
+  const [name, setName] = useState(""); const [email, setEmail] = useState(""); const [relationship, setRelationship] = useState("Partner");
+  const [editName, setEditName] = useState(""); const [editRelationship, setEditRelationship] = useState("");
+  const [invitationLink, setInvitationLink] = useState("");
+  const [feedback, setFeedback] = useState({ text: "", error: false });
+  const [busy, setBusy] = useState(false); const lock = useRef(false);
+  const selected = caregiverRecords.find((member) => member.id === selectedId);
+  const pending = invitations.filter((item) => item.status === "Pending");
+  const loadInvitations = useCallback(async () => {
+    if (!canManage || !account?.patient_id || !account.caregiver_id) { setInviteLoading(false); return; }
+    try { const [items, capability] = await Promise.all([api.getCaregiverInvitations({ patientId: account.patient_id, caregiverId: account.caregiver_id }), api.invitationDelivery()]); setInvitations(items); setDelivery(capability); }
+    catch (cause) { setFeedback({ text: cause instanceof Error ? cause.message : "Invitations could not be loaded", error: true }); }
+    finally { setInviteLoading(false); }
+  }, [account, canManage]);
+  useEffect(() => { const timer = window.setTimeout(() => void loadInvitations(), 0); return () => window.clearTimeout(timer); }, [loadInvitations]);
+  async function run(action: () => Promise<unknown>, text: string) {
+    if (lock.current) return; lock.current = true; setBusy(true); setFeedback({ text: "", error: false });
+    try { const result = await action(); setFeedback({ text: typeof result === "string" ? result : text, error: false }); }
+    catch (cause) { setFeedback({ text: cause instanceof Error ? cause.message : "The change could not be saved", error: true }); }
+    finally { lock.current = false; setBusy(false); }
   }
-
-  async function removeSelectedCaregiver() {
-    if (!selectedCaregiver || removing || selectedCaregiver.relationship === "Primary caregiver") return;
-    if (!window.confirm(`Remove ${selectedCaregiver.name} from this patient's Care Circle? Their patient-specific access will be revoked; their global account, if any, is not deleted.`)) return;
-    setRemoving(true);
-    try {
-      await removeCaregiver(selectedCaregiver.id);
-      setSelectedCaregiver(null);
-      setFeedback(`${selectedCaregiver.name} was removed from the Care Circle.`);
-    } catch (error) {
-      setFeedback(error instanceof Error ? error.message : "Caregiver removal is unavailable.");
-    } finally {
-      setRemoving(false);
-    }
+  function select(member: ApiCaregiver) { setSelectedId(member.id); setEditName(member.name); setEditRelationship(member.relationship); }
+  function add(event: FormEvent) {
+    event.preventDefault();
+    const sendEmail = (event.nativeEvent as SubmitEvent).submitter instanceof HTMLButtonElement && ((event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement).value === "email";
+    if (!account?.patient_id || !account.caregiver_id || !name.trim()) return;
+    void run(async () => {
+      if (mode === "simulated") {
+        await api.createDemoCaregiver({ patient_id: account.patient_id!, actor_caregiver_id: account.caregiver_id!, name: name.trim(), relationship, role: "Support caregiver", coordination_access: true });
+        await refreshData(); setMode(null);
+      } else {
+        const result = await api.createCaregiverInvitation({ name: name.trim(), email: email.trim(), relationship, delivery: sendEmail ? "email" : "link" });
+        setInvitationLink(`${window.location.origin}/onboarding?role=caregiver&invitation=${encodeURIComponent(result.token)}`);
+        await loadInvitations();
+        if (result.email_status === "accepted") return "Invitation email accepted for delivery.";
+        if (sendEmail) throw new Error("Email delivery was not confirmed. Your invitation link is ready to copy and share securely.");
+        return "Invitation link ready. Share it securely.";
+      }
+      setName(""); setEmail("");
+    }, mode === "simulated" ? "Simulated caregiver added. Task and handoff sharing are enabled; you can change them anytime." : "Invitation ready. Share the secure link with your caregiver.");
   }
-  return (
-    <AppShell>
-      <div>
-        {/* Header */}
-        <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9A9196]">
-              Care Circle
-            </p>
+  const message = <Message error={feedback.error}>{feedback.text}</Message>;
+  return <AppShell><PageHeading title="People you trust" description="Invite your care circle and choose how each person can help." action={canManage && <div className="flex flex-wrap gap-2"><Button disabled={busy} onClick={() => { setInvitationLink(""); setMode("invite"); }}><UserPlus size={16} />Invite caregiver</Button>{simulatedEnabled && delivery.simulated_available && <Button variant="secondary" disabled={busy} onClick={() => { setInvitationLink(""); setMode("simulated"); }}><Plus size={16} />Add simulated caregiver</Button>}</div>} />
+    {message}{error && <Message error>{error}</Message>}
+    <Panel title="Your Care Circle" description={`${caregiverRecords.length} active caregiver${caregiverRecords.length === 1 ? "" : "s"}`} action={<Link href="/consent" className="mc-caption text-[var(--mc-brand)] underline">Manage sharing</Link>}>
+      {loading ? <p role="status" className="mc-caption">Loading Care Circle...</p> : !caregiverRecords.length ? <div className="py-8"><h3 className="font-semibold">Bring your trusted people together</h3><p className="mc-caption mt-2">Invite someone to help with appointments, responsibilities or handoffs. Access starts only after they accept and you enable sharing.</p></div> : <div className="grid gap-3 md:grid-cols-2">{caregiverRecords.map((member) => <article key={member.id} className="relative flex items-center gap-3 rounded-2xl border border-[var(--mc-border)] p-4"><button type="button" className="absolute inset-0 rounded-2xl" aria-label={`Manage ${member.name}, ${member.relationship}`} onClick={() => select(member)} /><div className="pointer-events-none relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--mc-surface-muted)] font-semibold text-[var(--mc-brand)]">{member.name.split(/\s+/).map((part) => part[0]).slice(0, 2).join("")}</div><div className="pointer-events-none relative min-w-0 flex-1"><h3 className="break-words font-semibold">{member.name}</h3><p className="mc-caption">{member.relationship}</p><div className="mt-2 flex gap-2"><Badge tone="success">Active</Badge>{member.is_demo && <Badge>Simulated</Badge>}</div></div><button type="button" className="mc-icon-button relative" aria-label={`More options for ${member.name}`} onClick={() => select(member)}><MoreHorizontal size={18} /></button></article>)}</div>}
+    </Panel>
+    {canManage && <Panel title="Pending invitations" description={delivery.email_available ? "Invitations expire after seven days. Email acceptance does not confirm that an invitation has been opened." : "Invitations expire after seven days. Email delivery is unavailable; share your secure link directly."} className="mt-5">{inviteLoading ? <p role="status" className="mc-caption">Loading invitations...</p> : pending.length ? <div className="divide-y divide-[var(--mc-border)]">{pending.map((item) => <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 py-3"><div><p className="font-semibold">{item.name || item.email}</p><p className="mc-caption break-all">{item.email} - {item.relationship}</p><p className="mc-caption">Expires {displayTimestamp(item.expires_at)}</p><p className="mc-caption">{item.email_status === "accepted" ? "Email accepted for delivery" : item.email_status === "failed" || item.email_status === "unavailable" ? "Email not confirmed; share a secure link" : "Secure link invitation"}</p></div><Button variant="secondary" disabled={busy} onClick={() => { if (window.confirm(`Withdraw the invitation for ${item.email}? It can no longer be accepted.`)) void run(async () => { await api.withdrawCaregiverInvitation(item.id); setInvitations((current) => current.filter((entry) => entry.id !== item.id)); }, "Invitation withdrawn"); }}>Withdraw invitation</Button></div>)}</div> : <p className="mc-caption">No pending invitations.</p>}</Panel>}
 
-            <h1 className="mt-2 text-3xl font-semibold tracking-[-0.03em] text-[#211C1F]">
-              People you trust
-            </h1>
-
-            <p className="mt-2 max-w-xl text-sm leading-6 text-[#756D72]">
-              Choose who can help coordinate your care and control what each
-              person can access.
-            </p>
-          </div>
-
-          <motion.button
-            whileHover={{ y: -1 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => {
-              setFeedback("Invitations are not available in this workspace.");
-              window.setTimeout(() => setFeedback(""), 2600);
-            }}
-            className="flex items-center justify-center gap-2 rounded-[13px] bg-[#6D3A5B] px-4 py-2.5 text-xs font-semibold text-white shadow-sm"
-          >
-            <UserPlus size={15} />
-            Add caregiver
-          </motion.button>
-        </div>
-
-        {feedback && (
-          <div className="mt-5 rounded-[12px] border border-[#CFE0D5] bg-[#F1F8F3] px-3 py-2 text-xs font-medium text-[#3F6D56]" role="status">
-            {feedback}
-          </div>
-        )}
-
-        {/* Patient control banner */}
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mt-8 rounded-[20px] border border-[#E4D7DF] bg-[#F8F2F6] p-5"
-        >
-          <div className="flex gap-4">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-[#EBDCE5] text-[#6D3A5B]">
-              <ShieldCheck size={19} />
-            </div>
-
-            <div>
-              <p className="text-sm font-semibold text-[#211C1F]">
-                You are in control
-              </p>
-
-              <p className="mt-1 max-w-2xl text-xs leading-5 text-[#756D72]">
-                Caregivers only receive the information and coordination access
-                you approve. You can change or revoke access at any time.
-              </p>
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Caregiver list */}
-        <section className="mt-8">
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-semibold text-[#211C1F]">
-                Your caregivers
-              </h2>
-
-              <p className="mt-1 text-[11px] text-[#9A9196]">
-                {caregiverRecords.length} care team member{caregiverRecords.length === 1 ? "" : "s"}
-              </p>
-            </div>
-
-            <div className="flex items-center gap-1.5 text-[10px] font-medium text-[#4F8068]">
-              <CheckCircle2 size={13} />
-              Care team
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            {caregiverRecords.map((caregiver, index) => (
-              <motion.div
-                key={caregiver.name}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.07 }}
-                className="group rounded-[18px] border border-[#E9E1E4] bg-white p-5 shadow-[0_6px_24px_rgba(33,28,31,0.025)]"
-              >
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-                  {/* Avatar */}
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#F0E5EB] text-xs font-semibold text-[#6D3A5B]">
-                    {initials(caregiver.name)}
-                  </div>
-
-                  {/* Person */}
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="text-sm font-semibold text-[#211C1F]">
-                        {caregiver.name}
-                      </h3>
-
-                      <span className="rounded-full bg-[#F5F1F3] px-2 py-1 text-[9px] font-medium text-[#756D72]">
-                        {caregiver.relationship}
-                      </span>
-                    </div>
-
-                    <p className="mt-1 text-[10px] text-[#9A9196]">
-                      {caregiver.access_status}
-                    </p>
-                  </div>
-
-                  {/* Access */}
-                  <div className="sm:w-44">
-                    <p className="text-[9px] font-semibold uppercase tracking-[0.1em] text-[#9A9196]">
-                      Access
-                    </p>
-
-                    <p className="mt-1 text-[11px] font-medium text-[#211C1F]">
-                      {caregiver.access_status === "Active" ? "Patient-approved access" : "Access revoked"}
-                    </p>
-                  </div>
-
-                  {/* Status */}
-                  <div className="flex items-center gap-2">
-                    <span className="flex items-center gap-1.5 rounded-full bg-[#EEF5F0] px-2.5 py-1.5 text-[9px] font-semibold text-[#4F8068]">
-                      <span className="h-1.5 w-1.5 rounded-full bg-[#4F8068]" />
-                      Active
-                    </span>
-
-                    <button
-                    onClick={() => setSelectedCaregiver(caregiver)}
-                      aria-label={`Manage ${caregiver.name}`}
-                      className="flex h-8 w-8 items-center justify-center rounded-lg text-[#9A9196] transition hover:bg-[#F7F3F5] hover:text-[#6D3A5B]"
-                    >
-                      <MoreHorizontal size={16} />
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </section>
-
-        {/* Information cards */}
-        <div className="mt-8 grid gap-4 md:grid-cols-3">
-          <InfoCard
-            icon={<Users size={17} />}
-            title="Care coordination"
-            text="Help with appointments, tasks and handoffs."
-          />
-
-          <InfoCard
-            icon={<Mail size={17} />}
-            title="Approved updates"
-            text="Share selected information with trusted people."
-          />
-
-          <InfoCard
-            icon={<ShieldCheck size={17} />}
-            title="Patient controlled"
-            text="Access can be reviewed or revoked by you."
-          />
-        </div>
-
-        <AnimatePresence>
-          {selectedCaregiver && (
-            <>
-              {/* Overlay */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setSelectedCaregiver(null)}
-                className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[2px]"
-              />
-
-              {/* Drawer */}
-              <motion.aside
-                initial={{ x: "100%" }}
-                animate={{ x: 0 }}
-                exit={{ x: "100%" }}
-                transition={{
-                  type: "spring",
-                  damping: 28,
-                  stiffness: 280,
-                }}
-                className="fixed right-0 top-0 z-50 flex h-full w-full max-w-md flex-col border-l border-[#E9E1E4] bg-white shadow-2xl"
-              >
-                {/* Header */}
-                <div className="flex items-center justify-between border-b border-[#E9E1E4] px-6 py-5">
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9A9196]">
-                      Caregiver access
-                    </p>
-
-                    <h2 className="mt-1 text-lg font-semibold text-[#211C1F]">
-                      {selectedCaregiver.name}
-                    </h2>
-                  </div>
-
-                  <button
-                    onClick={() => setSelectedCaregiver(null)}
-                    className="flex h-9 w-9 items-center justify-center rounded-full bg-[#F7F3F5] text-[#756D72] hover:text-[#6D3A5B]"
-                  >
-                    <X size={17} />
-                  </button>
-                </div>
-
-                {/* Content */}
-                <div className="flex-1 overflow-y-auto px-6 py-6">
-                  {/* Caregiver identity */}
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#F0E5EB] text-sm font-semibold text-[#6D3A5B]">
-                      {initials(selectedCaregiver.name)}
-                    </div>
-
-                    <div>
-                      <p className="text-sm font-semibold text-[#211C1F]">
-                        {selectedCaregiver.name}
-                      </p>
-
-                      <p className="mt-1 text-[10px] text-[#9A9196]">
-                        {selectedCaregiver.relationship}
-                      </p>
-                    </div>
-                  </div>
-
-                 {/* Permissions */}
-                    <div className="mt-8">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-[#9A9196]">
-                        Approved access
-                    </p>
-
-                    <div className="mt-3 space-y-2">
-                        {permissionKeys.map((permission) => {
-                        const caregiverName = selectedCaregiver.name;
-                        const enabled =
-                            permissions[caregiverName as DemoOwner]?.[permission] ?? false;
-
-                        return (
-                            <button
-                            key={permission}
-                            type="button"
-                            aria-pressed={enabled}
-                            disabled={pendingPermission !== null}
-                            aria-label={`${permission}: ${enabled ? "enabled" : "disabled"}`}
-                            onClick={async () => {
-    if (pendingPermission !== null) return;
-    setPendingPermission(permission);
-    try {
-        await updateConsentPermission(
-            caregiverName as DemoOwner,
-            permission,
-            !enabled
-        );
-        setFeedback("Permission updated successfully.");
-    } catch (error) {
-        setFeedback(
-            error instanceof Error
-                ? error.message
-                : "Unable to update permission."
-        );
-    } finally {
-        setPendingPermission(null);
-    }
-}}
-                            className="flex w-full items-center justify-between rounded-[14px] border border-[#E9E1E4] px-4 py-3 text-left transition hover:bg-[#FBF8F7] disabled:cursor-wait disabled:opacity-65"
-                            >
-                            <span className="text-xs font-medium text-[#211C1F]">
-                                {pendingPermission === permission ? "Saving permission…" : permission}
-                            </span>
-
-                            <span
-                                className={`flex h-6 w-6 items-center justify-center rounded-full transition ${
-                                enabled
-                                    ? "bg-[#E7EEE9] text-[#4F8068]"
-                                    : "bg-[#F3EFF1] text-[#A59CA1]"
-                                }`}
-                            >
-                                {enabled ? <Check size={13} /> : <X size={13} />}
-                            </span>
-                            </button>
-                        );
-                        })}
-                    </div>
-                    </div>
-
-                  {/* Privacy */}
-                  <div className="mt-6 rounded-[16px] bg-[#F8F2F6] p-4">
-                    <div className="flex gap-3">
-                      <ShieldCheck
-                        size={17}
-                        className="mt-0.5 shrink-0 text-[#6D3A5B]"
-                      />
-
-                      <div>
-                        <p className="text-xs font-semibold text-[#211C1F]">
-                          Patient-controlled access
-                        </p>
-
-                        <p className="mt-1 text-[10px] leading-4 text-[#756D72]">
-                          This caregiver can only access information you have
-                          approved. Clinical information is not shared
-                          automatically.
-                        </p>
-                      </div>
-
-                      {selectedCaregiver.relationship !== "Primary caregiver" && (
-                        <div className="mt-8 border-t border-[#E9E1E4] pt-6">
-                          <button
-                            type="button"
-                            disabled={removing}
-                            onClick={() => void removeSelectedCaregiver()}
-                            className="flex w-full items-center justify-center gap-2 rounded-[12px] border border-[#E7C8CC] py-3 text-xs font-semibold text-[#9D4B55] transition hover:bg-[#FFF5F5] disabled:cursor-wait disabled:opacity-60"
-                          >
-                            <RotateCcw size={14} />
-                            {removing ? "Removing access…" : `Remove ${selectedCaregiver.name}`}
-                          </button>
-                          <p className="mt-2 text-[10px] leading-4 text-[#9A9196]">This revokes this patient-specific relationship and preserves access history. It does not delete a global account.</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Access history */}
-                  <div className="mt-8">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-[#9A9196]">
-                      Access history
-                    </p>
-
-                    <div className="mt-3 rounded-[14px] border border-[#E9E1E4] p-4">
-                      <div className="flex items-start gap-3">
-                        <CheckCircle2
-                          size={16}
-                          className="mt-0.5 text-[#4F8068]"
-                        />
-
-                        <div>
-                          <p className="text-[11px] font-semibold text-[#211C1F]">
-                            Permission state
-                          </p>
-
-                          <p className="mt-1 text-[10px] leading-4 text-[#9A9196]">
-                            Activity history is retained for continuity and review.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Footer */}
-                <div className="border-t border-[#E9E1E4] p-6">
-                  <button
-                    onClick={() => setSelectedCaregiver(null)}
-                    className="w-full rounded-[13px] border border-[#E9E1E4] bg-white py-3 text-xs font-semibold text-[#6D3A5B] transition hover:bg-[#F8F2F6]"
-                  >
-                    Close
-                  </button>
-                </div>
-              </motion.aside>
-            </>
-          )}
-        </AnimatePresence>
-    </div>
-    </AppShell>
-  );
-}
-
-function InfoCard({
-  icon,
-  title,
-  text,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  text: string;
-}) {
-  return (
-    <div className="rounded-[17px] border border-[#E9E1E4] bg-white p-5">
-      <div className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-[#F4EDF1] text-[#6D3A5B]">
-        {icon}
-      </div>
-
-      <h3 className="mt-4 text-xs font-semibold text-[#211C1F]">
-        {title}
-      </h3>
-
-      <p className="mt-1.5 text-[10px] leading-4 text-[#756D72]">
-        {text}
-      </p>
-    </div>
-  );
+    {mode && <Drawer title={mode === "invite" ? "Invite a caregiver" : "Add simulated caregiver"} onClose={() => { if (!busy) setMode(null); }}><form onSubmit={add}><p className="mc-caption mb-4">{mode === "simulated" ? "Fictional caregivers have no sign-in account. Adding one enables task and handoff sharing, which you can change anytime." : delivery.explanation}</p><fieldset disabled={busy}><Field label="Name"><input required value={name} maxLength={200} onChange={(event) => setName(event.target.value)} autoFocus /></Field>{mode === "invite" && <Field label="Email"><input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} /></Field>}<Field label="Relationship"><select value={relationship} onChange={(event) => setRelationship(event.target.value)}>{relationships.map((value) => <option key={value}>{value}</option>)}</select></Field>{mode === "invite" && delivery.email_available && <Button type="submit" value="email" disabled={busy}>{busy ? "Saving..." : "Send invitation"}</Button>}<Button type="submit" value="link" variant={mode === "invite" && delivery.email_available ? "secondary" : "primary"} className="mt-2" disabled={busy}>{busy ? "Saving..." : mode === "invite" ? "Create invitation link" : "Add simulated caregiver"}</Button></fieldset></form>{invitationLink && <div className="mt-5"><Field label="Secure invitation link"><textarea readOnly value={invitationLink} /></Field><Button variant="secondary" onClick={() => void run(() => navigator.clipboard.writeText(invitationLink), "Invitation link copied. Share it directly with your caregiver.")}>Copy invitation link</Button></div>}{message}</Drawer>}
+    {selected && <Drawer title={selected.name} onClose={() => { if (!busy) setSelectedId(null); }}><div className="mb-5 flex gap-2"><Badge>{selected.relationship}</Badge>{selected.is_demo && <Badge>Simulated</Badge>}</div><h3 className="mb-4 font-semibold">Sharing categories</h3>{(canManage || selected.id === account?.caregiver_id) ? categories.map((category) => { const enabled = permissions[selected.id]?.[category] ?? false; return <div key={category} className="mb-4 flex items-center justify-between gap-3"><span className="text-sm">{category}</span><button type="button" role="switch" aria-label={`${category} for ${selected.name}`} aria-checked={enabled} disabled={busy || !canManage} onClick={() => void run(() => updateConsentPermission(selected.id, category, !enabled), "Permissions saved")} className={`relative h-7 w-12 rounded-full transition disabled:opacity-50 ${enabled ? "bg-[var(--mc-brand)]" : "bg-[var(--mc-border)]"}`}><span className={`absolute left-1 top-1 h-5 w-5 rounded-full bg-white transition-transform ${enabled ? "translate-x-5" : ""}`} /></button></div>; }) : <p className="mc-caption">Sharing details are visible to the Care Circle owner and this caregiver.</p>}{canManage && <><form className="mt-6 border-t border-[var(--mc-border)] pt-5" onSubmit={(event) => { event.preventDefault(); void run(async () => { await api.updateCaregiver(selected.id, { name: editName, relationship: editRelationship, actor_caregiver_id: account!.caregiver_id! }); await refreshData(); }, "Caregiver details saved"); }}><Field label="Display name"><input required value={editName} onChange={(event) => setEditName(event.target.value)} /></Field><Field label="Relationship"><input required maxLength={100} value={editRelationship} onChange={(event) => setEditRelationship(event.target.value)} /></Field><Button type="submit" variant="secondary" disabled={busy}>Save details</Button></form><Button variant="danger" className="mt-5" disabled={busy} onClick={() => { if (window.confirm(`Remove ${selected.name} from your Care Circle? Their access will be revoked; history will remain.`)) void run(async () => { await removeCaregiver(selected.id); setSelectedId(null); }, "Caregiver access revoked"); }}>Remove caregiver</Button></>}{message}</Drawer>}
+  </AppShell>;
 }

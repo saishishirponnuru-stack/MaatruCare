@@ -12,15 +12,26 @@ It is designed as an **assistive coordination platform**, not a diagnostic or tr
 
 ---
 
-## 🌐 Live Demo
+## 🌐 Deployment and local development
 
-**Live application:**  
+**Live application:**
 https://maatru-care.vercel.app/
 
-**GitHub repository:**  
+**GitHub repository:**
 https://github.com/saishishirponnuru-stack/MaatruCare
 
-> **Demo note:** The current deployment uses synthetic demo data and session-based frontend state. Changes are intentionally reset when the browser session is refreshed.
+Authentication uses Supabase Auth for email/password sessions, verification, and password recovery. The frontend requires `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`; the backend independently verifies bearer tokens with `SUPABASE_JWT_SECRET`, `SUPABASE_AUDIENCE`, and (when configured) `SUPABASE_ISSUER`. New patient accounts create a new patient-scoped workspace. Caregiver accounts require a one-time invitation created by an authorized patient controller.
+
+Google sign-in uses Supabase's managed Google provider. In Supabase, enable Google under **Authentication → Providers → Google**, add the Google OAuth client ID and secret there, and use the Supabase callback URL shown by that provider configuration (normally `https://<project-ref>.supabase.co/auth/v1/callback`) as the Google Cloud OAuth client's authorized redirect URI. In **Authentication → URL Configuration**, set the local Site URL to `http://localhost:3000` while developing or the production Site URL to `https://maatru-care.vercel.app`, and allow these application redirect URLs:
+
+- `http://localhost:3000/auth/callback`
+- `https://maatru-care.vercel.app/auth/callback`
+
+The application never receives or verifies Google tokens directly. Supabase establishes the session, and FastAPI verifies the resulting Supabase access token.
+
+Local development defaults to SQLite at `backend/maatrucare.db`. For production, configure `DATABASE_URL` to a durable managed database; do not rely on an ephemeral Render filesystem for application data. Keep all Supabase, Gemini, and database secrets in the deployment environment, never in the frontend bundle or repository.
+
+For an isolated fictional demo workspace only, set both `MAATRUCARE_DEMO_CAREGIVERS_ENABLED=true` in the backend environment and `NEXT_PUBLIC_DEMO_CAREGIVERS_ENABLED=true` in the frontend environment. This exposes **Add Demo Caregiver**, which creates clearly labeled, non-authenticated participants scoped to the authorized patient controller. It does not send invitations or grant caregiver login access. Keep both flags unset or false for normal and production use.
 
 ---
 

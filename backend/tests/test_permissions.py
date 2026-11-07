@@ -112,7 +112,7 @@ def test_revoked_handoff_permission_blocks_access(client: TestClient) -> None:
 def test_disabled_coordination_permission_denies_caregiver_and_task_reads(client: TestClient, db_session) -> None:
     permission = db_session.scalar(
         select(Permission).where(
-            Permission.caregiver_id == 1,
+            Permission.caregiver_id == 2,
             Permission.permission_name == "Coordination tasks",
         )
     )
@@ -122,12 +122,12 @@ def test_disabled_coordination_permission_denies_caregiver_and_task_reads(client
     db_session.commit()
 
     try:
-        caregivers = client.get("/api/caregivers?actor_caregiver_id=1")
-        tasks = client.get("/api/tasks?actor_caregiver_id=1")
+        caregivers = client.get("/api/caregivers?actor_caregiver_id=2")
+        tasks = client.get("/api/tasks?actor_caregiver_id=2")
         assert caregivers.status_code == 403
-        assert caregivers.json()["detail"] == "Permission is not enabled"
+        assert caregivers.json()["detail"] == "Coordination tasks sharing is off for this caregiver"
         assert tasks.status_code == 403
-        assert tasks.json()["detail"] == "Permission is not enabled"
+        assert tasks.json()["detail"] == "Coordination tasks sharing is off for this caregiver"
     finally:
         permission.enabled = previous_enabled
         db_session.commit()

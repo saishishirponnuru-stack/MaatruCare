@@ -1,0 +1,21 @@
+# Upload only canonical frontend release inputs.
+.env
+.env.*
+!.env.example
+.vercel
+node_modules
+.next
+.next-qa
+.next.backup-*
+out
+build
+coverage
+*.tsbuildinfo
+**/*.backup-*
+**/*.before-*
+**/*.bak
+**/*_backup.*
+**/*-checkpoint-*
+**/theme-checkpoint-*
+**/local-backups
+*.log

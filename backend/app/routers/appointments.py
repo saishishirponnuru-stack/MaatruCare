@@ -6,7 +6,7 @@ from ..database import get_db
 from ..models import Appointment
 from ..schemas import AppointmentAction, AppointmentCreate, AppointmentResponse, AppointmentUpdate
 from ..services.access_service import get_active_caregiver, require_patient_caregiver, require_permission
-from ..services.audit_service import record_audit
+from ..services.audit_service import record_audit, record_timeline_event
 
 router = APIRouter(prefix="/api/appointments", tags=["appointments"])
 
@@ -40,6 +40,7 @@ def create_appointment(payload: AppointmentCreate, db: Session = Depends(get_db)
         db.add(appointment)
         db.flush()
         record_audit(db, patient_id=payload.patient_id, actor_name=actor.name, action="appointment_created", resource_type="Appointment", resource_id=appointment.id)
+        record_timeline_event(db, patient_id=payload.patient_id, event_type="Appointment", title="Appointment scheduled", description=f"{appointment.title} was scheduled.", source="Appointment")
         db.commit()
     except Exception:
         db.rollback()
@@ -64,6 +65,7 @@ def update_appointment(appointment_id: int, payload: AppointmentUpdate, db: Sess
         setattr(appointment, key, value.strip() if isinstance(value, str) else value)
     try:
         record_audit(db, patient_id=appointment.patient_id, actor_name=actor.name, action="appointment_updated", resource_type="Appointment", resource_id=appointment.id)
+        record_timeline_event(db, patient_id=appointment.patient_id, event_type="Appointment", title="Appointment updated", description=f"{appointment.title} was updated.", source="Appointment")
         db.commit()
     except Exception:
         db.rollback()
@@ -83,6 +85,7 @@ def cancel_appointment(appointment_id: int, payload: AppointmentAction, db: Sess
     appointment.status = "Cancelled"
     try:
         record_audit(db, patient_id=appointment.patient_id, actor_name=actor.name, action="appointment_cancelled", resource_type="Appointment", resource_id=appointment.id)
+        record_timeline_event(db, patient_id=appointment.patient_id, event_type="Appointment", title="Appointment cancelled", description=f"{appointment.title} was cancelled.", source="Appointment")
         db.commit()
     except Exception:
         db.rollback()

@@ -108,7 +108,7 @@ def test_handoff_audit_rows_are_non_sensitive(client: TestClient, db_session) ->
 	client.post(f"/api/handoffs/{created['id']}/send", json={"actor_caregiver_id": 1})
 	client.post(f"/api/handoffs/{created['id']}/acknowledge", json={"actor_caregiver_id": 2})
 
-	rows = db_session.scalars(select(AuditLog).where(AuditLog.resource_id == created["id"]).order_by(AuditLog.id)).all()
+	rows = db_session.scalars(select(AuditLog).where(AuditLog.resource_type == "CareHandoff", AuditLog.resource_id == created["id"]).order_by(AuditLog.id)).all()
 	assert [row.action for row in rows] == ["handoff_created", "handoff_sent", "handoff_acknowledged"]
 	assert all(row.resource_type == "CareHandoff" for row in rows)
 	events = db_session.scalars(select(TimelineEvent).where(TimelineEvent.source == "Care handoff", TimelineEvent.title.in_(["Care handoff prepared", "Care handoff sent", "Care handoff acknowledged"]))).all()
@@ -170,6 +170,36 @@ def test_handoff_completion_lifecycle(client: TestClient, db_session) -> None:
         assert [row.action for row in rows][-1] == "handoff_completed"
 
 
+def test_demo_sender_handoff_audits_authenticated_controller(client: TestClient, db_session, monkeypatch) -> None:
+        from app.models import Caregiver
+
+        monkeypatch.setenv("MAATRUCARE_DEMO_CAREGIVERS_ENABLED", "true")
+        enable_handoff_access(client)
+        demo = client.post(
+                "/api/caregivers/demo",
+		        json={"patient_id": 1, "name": "Demo Sender Audit", "relationship": "Partner", "role": "Support caregiver", "actor_caregiver_id": 1},
+        )
+        assert demo.status_code == 201
+        for caregiver_id in (demo.json()["id"], 2):
+                permission = client.put(
+                        "/api/permissions",
+                        json={"patient_id": 1, "caregiver_id": caregiver_id, "permission_name": "Care handoffs", "enabled": True, "actor_caregiver_id": 1},
+                )
+                assert permission.status_code in {200, 409}
+
+        created = client.post(
+                "/api/handoffs",
+                json={"patient_id": 1, "title": "Demo sender audit", "from_caregiver_id": demo.json()["id"], "to_caregiver_id": 2, "reason": "Fictional logistics", "actor_caregiver_id": 1},
+        )
+        assert created.status_code == 201
+        audit = db_session.scalar(select(AuditLog).where(AuditLog.resource_id == created.json()["id"], AuditLog.action == "handoff_created"))
+        controller = db_session.get(Caregiver, 1)
+        assert audit is not None
+        assert controller is not None
+        assert audit.actor_name == controller.name
+        assert audit.actor_name != "Demo Sender Audit"
+
+
 def test_handoff_completion_rejects_non_recipient(client: TestClient) -> None:
         enable_handoff_access(client)
         created = client.post(
@@ -199,3 +229,42 @@ def test_handoff_completion_rejects_non_recipient(client: TestClient) -> None:
                 json={"actor_caregiver_id": 1},
         )
         assert response.status_code == 403
+
+
+def test_demo_recipient_transitions_are_explicitly_simulated(client: TestClient, db_session, monkeypatch) -> None:
+        from app.models import Caregiver
+
+        monkeypatch.setenv("MAATRUCARE_DEMO_CAREGIVERS_ENABLED", "true")
+        enable_handoff_access(client)
+        demo = client.post(
+                "/api/caregivers/demo",
+                json={"patient_id": 1, "name": "Demo Recipient Simulation", "relationship": "Partner", "role": "Support caregiver", "actor_caregiver_id": 1},
+        )
+        assert demo.status_code == 201
+        permission = client.put(
+                "/api/permissions",
+                json={"patient_id": 1, "caregiver_id": demo.json()["id"], "permission_name": "Care handoffs", "enabled": True, "actor_caregiver_id": 1},
+        )
+        assert permission.status_code in {200, 409}
+        created = client.post(
+                "/api/handoffs",
+                json={"patient_id": 1, "title": "Demo recipient transition", "from_caregiver_id": 1, "to_caregiver_id": demo.json()["id"], "reason": "Fictional logistics", "actor_caregiver_id": 1},
+        )
+        assert created.status_code == 201
+        handoff_id = created.json()["id"]
+        assert client.post(f"/api/handoffs/{handoff_id}/send", json={"actor_caregiver_id": 1}).status_code == 200
+        assert client.post(f"/api/handoffs/{handoff_id}/acknowledge", json={"actor_caregiver_id": 2}).status_code == 403
+        acknowledged = client.post(f"/api/handoffs/{handoff_id}/acknowledge", json={"actor_caregiver_id": 1})
+        assert acknowledged.status_code == 200
+        assert acknowledged.json()["status"] == "Acknowledged"
+        completed = client.post(f"/api/handoffs/{handoff_id}/complete", json={"actor_caregiver_id": 1})
+        assert completed.status_code == 200
+        assert completed.json()["status"] == "Completed"
+
+        rows = db_session.scalars(select(AuditLog).where(AuditLog.resource_type == "CareHandoff", AuditLog.resource_id == handoff_id).order_by(AuditLog.id)).all()
+        controller = db_session.get(Caregiver, 1)
+        assert controller is not None
+        assert [row.action for row in rows] == ["handoff_created", "handoff_sent", "handoff_acknowledged_simulated", "handoff_completed_simulated"]
+        assert all(row.actor_name == controller.name for row in rows[-2:])
+        events = db_session.scalars(select(TimelineEvent).where(TimelineEvent.source == "Care handoff", TimelineEvent.title.like("%simulation%"))).all()
+        assert {event.title for event in events} == {"Care handoff acknowledged (simulation)", "Care handoff completed (simulation)"}

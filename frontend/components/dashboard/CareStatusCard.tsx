@@ -79,11 +79,11 @@ export default function CareStatusCard() {
       {/* Privacy note */}
       <div className="mt-5 rounded-[14px] bg-[#FBF8F7] px-4 py-3">
         <p className="text-[10px] font-semibold uppercase tracking-[0.11em] text-[#9A9196]">
-          Patient control
+          You manage sharing
         </p>
 
         <p className="mt-1.5 text-[10px] leading-4 text-[#756D72]">
-          Sharing is controlled by the patient and limited to authorized
+          Sharing stays with the Care Circle owner and is limited to authorized
           members of the Care Circle.
         </p>
       </div>

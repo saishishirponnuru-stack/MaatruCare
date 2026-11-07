@@ -31,7 +31,7 @@ interface PreferencesContextValue extends AccessibilityPreferences {
 const STORAGE_KEY = "maatru-care-preferences";
 
 const defaults: AccessibilityPreferences = {
-  theme: "light",
+  theme: "dark",
   largerText: false,
   highContrast: false,
   reducedMotion: false,

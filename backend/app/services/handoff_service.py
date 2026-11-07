@@ -1,190 +1,168 @@
 from datetime import datetime
 
-from fastapi import HTTPException, status
-from sqlalchemy import select
+from fastapi import HTTPException
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from ..models import CareHandoff, Caregiver, Patient
-from .access_service import require_patient_caregiver, require_permission
+from ..models import CareHandoff, Patient, Task
+from .access_service import get_active_caregiver, get_patient_member, is_workspace_owner, require_patient_caregiver, require_patient_controller, require_permission
 from .audit_service import record_audit, record_timeline_event
 
 PREPARED = "Prepared"
 SENT = "Awaiting acknowledgement"
 ACKNOWLEDGED = "Acknowledged"
+COMPLETED = "Completed"
 CANCELLED = "Cancelled"
 
 
-def _get_patient(db: Session, patient_id: int) -> Patient:
-	patient = db.get(Patient, patient_id)
-	if patient is None:
-		raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
-	return patient
+def _get_handoff(db, handoff_id):
+    handoff = db.get(CareHandoff, handoff_id)
+    if handoff is None:
+        raise HTTPException(404, "Handoff not found")
+    return handoff
 
 
-def _get_caregiver(db: Session, caregiver_id: int, patient_id: int) -> Caregiver:
-	try:
-		return require_patient_caregiver(db, caregiver_id, patient_id)
-	except HTTPException as error:
-		if error.status_code == status.HTTP_404_NOT_FOUND:
-			raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Caregiver not found for patient") from error
-		raise
+def _require_actor(db, handoff, actor_id):
+    return require_patient_caregiver(db, actor_id, handoff.patient_id)
 
 
-def _get_handoff(db: Session, handoff_id: int) -> CareHandoff:
-	handoff = db.get(CareHandoff, handoff_id)
-	if handoff is None:
-		raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Handoff not found")
-	return handoff
+def _usable(handoff):
+    if handoff.archived_at is not None or handoff.status == CANCELLED:
+        raise HTTPException(409, "This handoff has been removed from active responsibilities")
 
 
-def _require_actor(db: Session, handoff: CareHandoff, actor_caregiver_id: int) -> Caregiver:
-	return _get_caregiver(db, actor_caregiver_id, handoff.patient_id)
+def _record_transition(db, handoff, actor, expected, values, action, title, description):
+    # Compare-and-set protects against double clicks and concurrent transitions.
+    changed = db.execute(update(CareHandoff).where(
+        CareHandoff.id == handoff.id, CareHandoff.status == expected,
+        CareHandoff.archived_at.is_(None),
+    ).values(**values).execution_options(synchronize_session=False))
+    if changed.rowcount != 1:
+        db.rollback()
+        raise HTTPException(409, "The handoff changed. Refresh before trying again.")
+    try:
+        record_audit(db, patient_id=handoff.patient_id, actor_name=actor.name, action=action, resource_id=handoff.id)
+        record_timeline_event(db, patient_id=handoff.patient_id, event_type="Coordination", title=title, description=description, source="Care handoff")
+        db.commit()
+        db.refresh(handoff)
+    except Exception:
+        db.rollback()
+        raise
+    return handoff
 
 
-def create_handoff(
-	db: Session,
-	*,
-	patient_id: int,
-	title: str,
-	from_caregiver_id: int,
-	to_caregiver_id: int,
-	reason: str,
-	actor_caregiver_id: int,
-) -> CareHandoff:
-	if not title.strip() or not reason.strip():
-		raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Title and reason are required")
-	if from_caregiver_id == to_caregiver_id:
-		raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Sender and recipient must differ")
-	_get_patient(db, patient_id)
-	sender = _get_caregiver(db, from_caregiver_id, patient_id)
-	recipient = _get_caregiver(db, to_caregiver_id, patient_id)
-	if actor_caregiver_id != from_caregiver_id:
-		raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Actor must be the handoff sender")
-	require_permission(db, sender, "Care handoffs")
-	require_permission(db, recipient, "Care handoffs")
-
-	handoff = CareHandoff(
-		patient_id=patient_id,
-		title=title.strip(),
-		from_caregiver_id=from_caregiver_id,
-		to_caregiver_id=to_caregiver_id,
-		reason=reason.strip(),
-		status=PREPARED,
-	)
-	try:
-		db.add(handoff)
-		db.flush()
-		record_audit(db, patient_id=patient_id, actor_name=sender.name, action="handoff_created", resource_id=handoff.id)
-		record_timeline_event(db, patient_id=patient_id, event_type="Coordination", title="Care handoff prepared", description="A coordination responsibility handoff was prepared.", source="Care handoff")
-		db.commit()
-	except Exception:
-		db.rollback()
-		raise
-	return handoff
-
-
-def send_handoff(db: Session, handoff_id: int, actor_caregiver_id: int) -> CareHandoff:
-	handoff = _get_handoff(db, handoff_id)
-	actor = _require_actor(db, handoff, actor_caregiver_id)
-	require_permission(db, actor, "Care handoffs")
-	if actor.id != handoff.from_caregiver_id:
-		raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the sender can send this handoff")
-	if handoff.status != PREPARED:
-		raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Handoff cannot be sent from its current state")
-	try:
-		handoff.status = SENT
-		record_audit(db, patient_id=handoff.patient_id, actor_name=actor.name, action="handoff_sent", resource_id=handoff.id)
-		record_timeline_event(db, patient_id=handoff.patient_id, event_type="Coordination", title="Care handoff sent", description="A coordination responsibility handoff was sent to an approved caregiver.", source="Care handoff")
-		db.commit()
-	except Exception:
-		db.rollback()
-		raise
-	return handoff
+def create_handoff(db: Session, *, patient_id: int, title: str, from_caregiver_id: int, to_caregiver_id: int, reason: str, actor_caregiver_id: int, context: str | None = None, related_task_id: int | None = None, ai_draft_id: int | None = None, human_approved: bool = False):
+    if not title.strip() or not reason.strip():
+        raise HTTPException(422, "Title and responsibility are required")
+    if from_caregiver_id == to_caregiver_id:
+        raise HTTPException(400, "Sender and recipient must differ")
+    if db.get(Patient, patient_id) is None:
+        raise HTTPException(404, "Care workspace not found")
+    actor = require_patient_caregiver(db, actor_caregiver_id, patient_id)
+    sender = get_patient_member(db, from_caregiver_id, patient_id)
+    recipient = get_patient_member(db, to_caregiver_id, patient_id)
+    if actor.id != sender.id and not (sender.is_demo and is_workspace_owner(db, actor)):
+        raise HTTPException(403, "Actor must be the handoff sender")
+    for participant in (actor, sender, recipient):
+        require_permission(db, participant, "Care handoffs")
+    if related_task_id is not None:
+        task = db.get(Task, related_task_id)
+        if task is None or task.patient_id != patient_id:
+            raise HTTPException(422, "Choose a task from this care workspace")
+        require_permission(db, actor, "Coordination tasks")
+        require_permission(db, recipient, "Coordination tasks")
+    if ai_draft_id is not None:
+        from .ai_draft_service import validate_handoff_approval
+        existing = validate_handoff_approval(db, ai_draft_id, human_approved, patient_id)
+        if existing is not None:
+            return existing
+    handoff = CareHandoff(patient_id=patient_id, title=title.strip(), from_caregiver_id=sender.id, to_caregiver_id=recipient.id, reason=reason.strip(), status=PREPARED, context=context, related_task_id=related_task_id, ai_draft_id=ai_draft_id)
+    try:
+        db.add(handoff)
+        db.flush()
+        if ai_draft_id is not None:
+            from .ai_draft_service import record_handoff_approval
+            record_handoff_approval(db, ai_draft_id, handoff, actor.name)
+        record_audit(db, patient_id=patient_id, actor_name=actor.name, action="handoff_created", resource_id=handoff.id)
+        record_timeline_event(db, patient_id=patient_id, event_type="Coordination", title="Care handoff prepared", description=f"{handoff.title}: {sender.name} to {recipient.name}.", source="Care handoff")
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return handoff
 
 
-def acknowledge_handoff(db: Session, handoff_id: int, actor_caregiver_id: int) -> CareHandoff:
-	handoff = _get_handoff(db, handoff_id)
-	actor = _require_actor(db, handoff, actor_caregiver_id)
-	require_permission(db, actor, "Care handoffs")
-	if actor.id != handoff.to_caregiver_id:
-		raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the intended recipient can acknowledge this handoff")
-	if handoff.status == ACKNOWLEDGED or handoff.acknowledged_at is not None:
-		raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Handoff has already been acknowledged")
-	if handoff.status != SENT:
-		raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Handoff cannot be acknowledged from its current state")
-	try:
-		handoff.status = ACKNOWLEDGED
-		handoff.acknowledged_at = datetime.utcnow()
-		record_audit(db, patient_id=handoff.patient_id, actor_name=actor.name, action="handoff_acknowledged", resource_id=handoff.id)
-		record_timeline_event(db, patient_id=handoff.patient_id, event_type="Coordination", title="Care handoff acknowledged", description="The intended caregiver acknowledged a coordination responsibility handoff.", source="Care handoff")
-		db.commit()
-	except Exception:
-		db.rollback()
-		raise
-	return handoff
+def send_handoff(db: Session, handoff_id: int, actor_caregiver_id: int):
+    handoff = _get_handoff(db, handoff_id)
+    actor = _require_actor(db, handoff, actor_caregiver_id)
+    require_permission(db, actor, "Care handoffs")
+    _usable(handoff)
+    sender = get_patient_member(db, handoff.from_caregiver_id, handoff.patient_id)
+    if actor.id != sender.id and not (sender.is_demo and is_workspace_owner(db, actor)):
+        raise HTTPException(403, "Only the sender can send this handoff")
+    require_permission(db, sender, "Care handoffs")
+    require_permission(db, get_patient_member(db, handoff.to_caregiver_id, handoff.patient_id), "Care handoffs")
+    if handoff.status != PREPARED:
+        raise HTTPException(409, "Only a prepared handoff can be sent")
+    return _record_transition(db, handoff, actor, PREPARED, {"status": SENT, "sent_at": datetime.utcnow()}, "handoff_sent", "Care handoff sent", f"{handoff.title} was sent to {handoff.to_name}.")
 
 
-def get_handoff_for_actor(db: Session, handoff_id: int, actor_caregiver_id: int) -> CareHandoff:
-	handoff = _get_handoff(db, handoff_id)
-	actor = _require_actor(db, handoff, actor_caregiver_id)
-	require_permission(db, actor, "Care handoffs")
-	if actor.id not in {handoff.from_caregiver_id, handoff.to_caregiver_id}:
-		raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Caregiver is not a participant in this handoff")
-	return handoff
+def _recipient_actor(db, handoff, actor_id):
+    actor = _require_actor(db, handoff, actor_id)
+    require_permission(db, actor, "Care handoffs")
+    recipient = get_patient_member(db, handoff.to_caregiver_id, handoff.patient_id)
+    simulated = bool(recipient.is_demo and is_workspace_owner(db, actor))
+    if actor.id != recipient.id and not simulated:
+        raise HTTPException(403, "Only the intended recipient can acknowledge this handoff")
+    require_permission(db, recipient, "Care handoffs")
+    _usable(handoff)
+    return actor, simulated
 
 
-def list_handoffs_for_actor(db: Session, actor_caregiver_id: int, patient_id: int | None = None) -> list[CareHandoff]:
-	caregiver = db.get(Caregiver, actor_caregiver_id)
-	if caregiver is None or caregiver.access_status != "Active":
-		raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Caregiver access is not active")
-	require_permission(db, caregiver, "Care handoffs")
-	query = select(CareHandoff).where(
-		CareHandoff.patient_id == caregiver.patient_id,
-		(CareHandoff.from_caregiver_id == actor_caregiver_id) | (CareHandoff.to_caregiver_id == actor_caregiver_id),
-	)
-	if patient_id is not None and patient_id != caregiver.patient_id:
-		raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Caregiver cannot access this patient")
-	return list(db.scalars(query.order_by(CareHandoff.id)).all())
+def acknowledge_handoff(db: Session, handoff_id: int, actor_caregiver_id: int):
+    handoff = _get_handoff(db, handoff_id)
+    actor, simulated = _recipient_actor(db, handoff, actor_caregiver_id)
+    if handoff.status != SENT or handoff.acknowledged_at is not None:
+        raise HTTPException(409, "Only a sent handoff can be acknowledged once")
+    return _record_transition(db, handoff, actor, SENT, {"status": ACKNOWLEDGED, "acknowledged_at": datetime.utcnow()}, "handoff_acknowledged_simulated" if simulated else "handoff_acknowledged", "Care handoff acknowledged (simulation)" if simulated else "Care handoff acknowledged", f"{handoff.title}: acknowledgement recorded" + (" by the Care Circle owner for a simulated caregiver." if simulated else f" by {handoff.to_name}."))
 
 
-def complete_handoff(db: Session, handoff_id: int, actor_caregiver_id: int) -> CareHandoff:
-        handoff = _get_handoff(db, handoff_id)
-        actor = _require_actor(db, handoff, actor_caregiver_id)
-        require_permission(db, actor, "Care handoffs")
+def complete_handoff(db: Session, handoff_id: int, actor_caregiver_id: int):
+    handoff = _get_handoff(db, handoff_id)
+    actor, simulated = _recipient_actor(db, handoff, actor_caregiver_id)
+    if handoff.status != ACKNOWLEDGED:
+        raise HTTPException(409, "Only an acknowledged handoff can be completed")
+    return _record_transition(db, handoff, actor, ACKNOWLEDGED, {"status": COMPLETED, "completed_at": datetime.utcnow()}, "handoff_completed_simulated" if simulated else "handoff_completed", "Care handoff completed (simulation)" if simulated else "Care handoff completed", f"{handoff.title}: completion recorded" + (" by the Care Circle owner for a simulated caregiver." if simulated else f" by {handoff.to_name}."))
 
-        if actor.id != handoff.to_caregiver_id:
-                raise HTTPException(
-                        status_code=status.HTTP_403_FORBIDDEN,
-                        detail="Only the receiving caregiver can complete this handoff",
-                )
 
-        if handoff.status != ACKNOWLEDGED:
-                raise HTTPException(
-                        status_code=status.HTTP_409_CONFLICT,
-                        detail="Only an acknowledged handoff can be completed",
-                )
+def remove_handoff(db: Session, handoff_id: int, actor_caregiver_id: int, expected_status: str):
+    handoff = _get_handoff(db, handoff_id)
+    actor = require_patient_controller(db, actor_caregiver_id, handoff.patient_id)
+    _usable(handoff)
+    if handoff.status != expected_status:
+        raise HTTPException(409, "The handoff changed. Review its current status before removing it.")
+    archive = handoff.status == COMPLETED
+    values = {"archived_at": datetime.utcnow()} if archive else {"status": CANCELLED, "cancelled_at": datetime.utcnow()}
+    return _record_transition(db, handoff, actor, expected_status, values, "handoff_archived" if archive else "handoff_cancelled", "Care handoff archived" if archive else "Care handoff cancelled", f"{handoff.title} was removed from active responsibilities. Its history is retained.")
 
-        try:
-                handoff.status = "Completed"
-                record_audit(
-                        db,
-                        patient_id=handoff.patient_id,
-                        actor_name=actor.name,
-                        action="handoff_completed",
-                        resource_id=handoff.id,
-                )
-                record_timeline_event(
-                        db,
-                        patient_id=handoff.patient_id,
-                        event_type="Coordination",
-                        title="Care handoff completed",
-                        description="The receiving caregiver completed the acknowledged coordination handoff.",
-                        source="Care handoff",
-                )
-                db.commit()
-                db.refresh(handoff)
-        except Exception:
-                db.rollback()
-                raise
 
-        return handoff
+def get_handoff_for_actor(db: Session, handoff_id: int, actor_caregiver_id: int):
+    handoff = _get_handoff(db, handoff_id)
+    actor = _require_actor(db, handoff, actor_caregiver_id)
+    require_permission(db, actor, "Care handoffs")
+    if not is_workspace_owner(db, actor) and actor.id not in {handoff.from_caregiver_id, handoff.to_caregiver_id}:
+        raise HTTPException(403, "Caregiver is not a participant in this handoff")
+    return handoff
+
+
+def list_handoffs_for_actor(db: Session, actor_caregiver_id: int, patient_id: int | None = None, include_archived: bool = False):
+    actor = get_active_caregiver(db, actor_caregiver_id)
+    require_permission(db, actor, "Care handoffs")
+    if patient_id is not None and patient_id != actor.patient_id:
+        raise HTTPException(403, "This handoff belongs to a different care workspace")
+    query = select(CareHandoff).where(CareHandoff.patient_id == actor.patient_id)
+    if not include_archived:
+        query = query.where(CareHandoff.archived_at.is_(None))
+    if not is_workspace_owner(db, actor):
+        query = query.where((CareHandoff.from_caregiver_id == actor.id) | (CareHandoff.to_caregiver_id == actor.id))
+    return list(db.scalars(query.order_by(CareHandoff.id)).all())

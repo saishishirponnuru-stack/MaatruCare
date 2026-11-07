@@ -1,6 +1,7 @@
 from datetime import date, datetime, time
 
-from pydantic import BaseModel, ConfigDict
+from typing import Literal
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ORMResponse(BaseModel):
@@ -17,10 +18,13 @@ class PatientResponse(ORMResponse):
 
 
 class CaregiverResponse(ORMResponse):
+	is_patient: bool = False
 	id: int
 	patient_id: int
 	name: str
 	relationship: str
+	role: str
+	is_demo: bool
 	email: str | None
 	access_status: str
 	created_at: datetime
@@ -35,6 +39,11 @@ class PermissionResponse(ORMResponse):
 
 
 class TaskResponse(ORMResponse):
+	owner_name: str | None = None
+	owner_is_demo: bool = False
+	note: str | None = None
+	priority: str = "Normal"
+	ai_draft_id: int | None = None
 	id: int
 	patient_id: int
 	title: str
@@ -49,7 +58,12 @@ class TaskResponse(ORMResponse):
 
 class TaskCreate(BaseModel):
 	patient_id: int
-	title: str
+	title: str = Field(min_length=1, max_length=255)
+	note: str | None = Field(default=None, max_length=2000)
+	priority: Literal["Low", "Normal", "High"] = "Normal"
+	ai_draft_id: int | None = None
+	ai_suggestion_index: int | None = Field(default=None, ge=0)
+	human_approved: bool = False
 	owner_id: int | None = None
 	owner_patient_id: int | None = None
 	due_date: date
@@ -58,6 +72,9 @@ class TaskCreate(BaseModel):
 
 
 class TaskUpdate(BaseModel):
+	note: str | None = Field(default=None, max_length=2000)
+	priority: Literal["Low", "Normal", "High"] | None = None
+	status: Literal["Open", "In progress", "Completed"] | None = None
 	title: str | None = None
 	owner_id: int | None = None
 	owner_patient_id: int | None = None
@@ -108,6 +125,17 @@ class AppointmentAction(BaseModel):
 
 
 class CareHandoffResponse(ORMResponse):
+	cancelled_at: datetime | None = None
+	archived_at: datetime | None = None
+	context: str | None = None
+	related_task_id: int | None = None
+	ai_draft_id: int | None = None
+	from_name: str
+	to_name: str
+	from_is_demo: bool
+	to_is_demo: bool
+	sent_at: datetime | None = None
+	completed_at: datetime | None = None
 	id: int
 	patient_id: int
 	title: str
@@ -120,11 +148,15 @@ class CareHandoffResponse(ORMResponse):
 
 
 class CareHandoffCreate(BaseModel):
+	context: str | None = Field(default=None, max_length=2000)
+	related_task_id: int | None = None
+	ai_draft_id: int | None = None
+	human_approved: bool = False
 	patient_id: int
-	title: str
+	title: str = Field(min_length=1, max_length=255)
 	from_caregiver_id: int
 	to_caregiver_id: int
-	reason: str
+	reason: str = Field(min_length=1, max_length=2000)
 	actor_caregiver_id: int
 
 
@@ -150,6 +182,10 @@ class ConsentRecordResponse(ORMResponse):
 
 
 class TimelineEventResponse(ORMResponse):
+	actor_name: str | None = None
+	resource_type: str | None = None
+	resource_id: int | None = None
+	simulated: bool = False
 	id: int
 	patient_id: int
 	event_type: str
@@ -168,3 +204,7 @@ class AuditLogResponse(ORMResponse):
 	resource_type: str
 	resource_id: int
 	created_at: datetime
+
+
+class CareHandoffManage(CareHandoffActor):
+	expected_status: Literal["Prepared", "Awaiting acknowledgement", "Acknowledged", "Completed"]

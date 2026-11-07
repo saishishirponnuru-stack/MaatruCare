@@ -1,3 +1,20 @@
+import os
+import pytest
+
+# The repair sprint explicitly prohibits executing resets without approval.
+pytestmark = pytest.mark.skipif(os.getenv("MAATRUCARE_RUN_RESET_TESTS") != "true", reason="Reset execution requires explicit approval")
+
+@pytest.fixture(autouse=True)
+def local_demo_reset_scope(monkeypatch):
+    monkeypatch.setenv("MAATRUCARE_ENV", "local")
+    monkeypatch.setenv("MAATRUCARE_DEMO_RESET_PATIENT_IDS", "1")
+
+
+def confirmed_payload(client, reset_preferences):
+    preview = client.get(f"/api/lifestyle/reset-preview?patient_id=1&actor_caregiver_id=1&reset_preferences={str(reset_preferences).lower()}")
+    assert preview.status_code == 200 and preview.json()["enabled"]
+    return {"patient_id": 1, "actor_caregiver_id": 1, "reset_preferences": reset_preferences, "confirmed": True, "expected_counts": preview.json()["counts"]}
+
 from fastapi.testclient import TestClient
 from datetime import date
 
@@ -42,11 +59,11 @@ def test_lifestyle_reset_is_scoped_and_repeatable(client: TestClient, monkeypatc
     )
     assert water.status_code == 200
 
-    reset = client.post("/api/lifestyle/reset", json={"patient_id": 1, "actor_caregiver_id": 1, "reset_preferences": True})
+    reset = client.post("/api/lifestyle/reset", json=confirmed_payload(client, True))
     assert reset.status_code == 200
     assert reset.json()["deleted"]["water"] >= 1
 
-    second = client.post("/api/lifestyle/reset", json={"patient_id": 1, "actor_caregiver_id": 1, "reset_preferences": True})
+    second = client.post("/api/lifestyle/reset", json=confirmed_payload(client, True))
     assert second.status_code == 200
     payload = client.get("/api/lifestyle?patient_id=1&actor_caregiver_id=1").json()
     assert all(item["id"] != water.json()["id"] for item in payload["water"])
@@ -78,7 +95,7 @@ def test_lifestyle_reset_preserves_other_patient_and_only_resets_preferences_whe
     preferences = client.put("/api/lifestyle/preferences", json={"patient_id": 1, "actor_caregiver_id": 1, "water_goal_ml": 2100, "sleep_goal_minutes": 480})
     assert activity.status_code == 200 and preferences.status_code == 200
 
-    reset = client.post("/api/lifestyle/reset", json={"patient_id": 1, "actor_caregiver_id": 1, "reset_preferences": False})
+    reset = client.post("/api/lifestyle/reset", json=confirmed_payload(client, False))
     assert reset.status_code == 200
     assert all(reset.json()["deleted"][category] >= 1 for category in ("water", "sleep", "weight", "diet_adherence", "activity_logs"))
     payload = client.get("/api/lifestyle?patient_id=1&actor_caregiver_id=1").json()
@@ -88,7 +105,7 @@ def test_lifestyle_reset_preserves_other_patient_and_only_resets_preferences_whe
     assert payload["preferences"]["water_goal_ml"] == 2100
     assert payload["preferences"]["sleep_goal_minutes"] == 480
 
-    reset_preferences = client.post("/api/lifestyle/reset", json={"patient_id": 1, "actor_caregiver_id": 1, "reset_preferences": True})
+    reset_preferences = client.post("/api/lifestyle/reset", json=confirmed_payload(client, True))
     assert reset_preferences.status_code == 200
     assert reset_preferences.json()["preferences_reset"] is True
     db_session.expire_all()

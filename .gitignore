@@ -22,3 +22,20 @@ venv/
 Thumbs.db
 
 .vscode/
+
+# Local checkpoints and scratch output are never release inputs.
+.vercel/
+.next-qa/
+.next.backup-*/
+**/*.backup-*
+**/*.before-*
+**/*.bak
+**/*_backup.*
+**/*-checkpoint-*/
+**/theme-checkpoint-*/
+**/local-backups/
+handoff*-backup*/
+.work/
+.manus/
+outputs/
+*.tmp

@@ -1,147 +1,75 @@
 "use client";
 
-import AppShell from "@/components/layout/AppShell";
+import { useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
-import { FormEvent, useMemo, useState } from "react";
-import { Pencil, ArrowUpRight, Car, Check, CheckSquare, Circle, FileText, Plus, Search, Trash2, UserRound, Users, X } from "lucide-react";
-import { useMaatruCareDemo, type DemoCategory as Category, type DemoOwner as Owner, type DemoTask as Task } from "@/context/MaatruCareDemoContext";
+import { Download, Plus, Search, CheckCircle2, Circle, Pencil } from "lucide-react";
+import AppShell from "@/components/layout/AppShell";
+import { Badge, Button, Drawer, Field, Message, PageHeading, Panel, Stat } from "@/components/ui/ProductUI";
+import { useMaatruCareDemo, type DemoTask, type DemoCategory, type DemoTaskStatus } from "@/context/MaatruCareDemoContext";
+import { useAuth } from "@/context/AuthContext";
+import { downloadCsv, optionLabel, participantOptions, todayLocal } from "@/lib/coordination";
 
-type Status = "Open" | "Completed";
-type CaregiverOwner = Exclude<Owner, "Ananya Rao">;
-const owners: Owner[] = ["Ananya Rao", "Rahul Rao", "Lakshmi Rao", "Priya Rao"];
-const categories: Category[] = ["Appointment", "Transport", "Patient", "Coordination"];
-const categoryIcons = { Appointment: FileText, Transport: Car, Patient: UserRound, Coordination: Users };
-function initials(value: string) { return value.split(" ").map((part) => part[0]).join(""); }
-function dateLabel(value: string) { return new Date(`${value}T00:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short" }); }
-function defaultDueDate() {
-  const date = new Date();
-  date.setDate(date.getDate() + 7);
-  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
-  return local.toISOString().slice(0, 10);
-}
-const emptyForm = { title: "", owner: "Rahul Rao" as Owner, category: "Coordination" as Category, dueDate: defaultDueDate(), note: "" };
+type Form = { title: string; ownerKey: string; dueDate: string; category: DemoCategory; note: string; priority: "Low" | "Normal" | "High"; status: DemoTaskStatus };
+const blank: Form = { title: "", ownerKey: "", dueDate: "", category: "Coordination", note: "", priority: "Normal", status: "Open" };
+const filters = ["All", "My tasks", "Open", "In progress", "Completed", "Overdue"];
 
 export default function TasksPage() {
-  const { tasks, addTask: addTaskAction, updateTask, completeTask, deleteTask, reassignTask: reassignTaskAction } = useMaatruCareDemo();
-  const [filter, setFilter] = useState("all");
-  const [category, setCategory] = useState("All");
+  const { account } = useAuth();
+  const { tasks, caregiverRecords, addTask, updateTask, completeTask, deleteTask, loading, taskError: error, refreshData, permissions } = useMaatruCareDemo();
+  const [filter, setFilter] = useState("All");
   const [search, setSearch] = useState("");
-  const [drawer, setDrawer] = useState<"add" | "details" | null>(null);
-  const [selected, setSelected] = useState<Task | null>(null);
-  const [editing, setEditing] = useState(false);
-  const [form, setForm] = useState(emptyForm);
-  const [toast, setToast] = useState("");
-  const [handoff, setHandoff] = useState<Task | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<Task | null>(null);
-  const [deleting, setDeleting] = useState(false);
+  const [drawer, setDrawer] = useState<"create" | "edit" | null>(null);
+  const [selected, setSelected] = useState<DemoTask | null>(null);
+  const [form, setForm] = useState<Form>(blank);
+  const [feedback, setFeedback] = useState({ message: "", error: false });
+  const [busy, setBusy] = useState(false);
+  const lock = useRef(false);
+  const today = todayLocal();
+  const options = participantOptions(account, caregiverRecords);
+  const ownKey = account?.role === "patient" ? `patient:${account.patient_id}` : `caregiver:${account?.caregiver_id}`;
+  const canWrite = Boolean(account?.caregiver_id && permissions[account.caregiver_id]?.["Coordination tasks"]);
+  const overdue = (task: DemoTask) => task.status !== "Completed" && task.dueDate < today;
+  const visible = tasks.filter((task) => (!search || `${task.title} ${task.owner} ${task.note}`.toLowerCase().includes(search.toLowerCase())) && (filter === "All" || filter === "My tasks" && task.ownerKey === ownKey || filter === "Overdue" && overdue(task) || task.status === filter));
 
-  function notify(message: string) { setToast(message); window.setTimeout(() => setToast(""), 2800); }
-  function editForm(task: Task) { setForm({ title: task.title, owner: task.owner, category: task.category, dueDate: task.dueDate, note: task.note }); }
-  function openTask(task: Task) { setSelected(task); editForm(task); setEditing(false); setDrawer("details"); }
-  async function toggleTask(task: Task) { const status: Status = task.status === "Open" ? "Completed" : "Open"; try { await completeTask(task.id); setSelected({ ...task, status }); notify(status === "Completed" ? "Task completed. Activity recorded in Timeline." : "Task reopened. Activity recorded in Timeline."); } catch (error) { notify(error instanceof Error ? error.message : "Task changes are unavailable."); } }
-  async function saveTask(event: FormEvent) { event.preventDefault(); if (!selected || !form.title.trim()) return; try { await updateTask(selected.id, { ...form, title: form.title.trim() });  setSelected({ ...selected, ...form, title: form.title.trim() }); setEditing(false); notify("Task updated."); } catch (error) { notify(error instanceof Error ? error.message : "Task changes are unavailable."); } }
-  async function addTask(event: FormEvent) { event.preventDefault(); if (!form.title.trim()) return; try { await addTaskAction({ ...form, title: form.title.trim(), note: form.note.trim() || "No additional note." }); setDrawer(null); setForm(emptyForm); notify("Task created."); } catch (error) { notify(error instanceof Error ? error.message : "Task creation is unavailable."); } }
-  async function confirmDelete() {
-    if (!deleteTarget || deleting) return;
-    setDeleting(true);
-    try {
-      await deleteTask(deleteTarget.id);
-      if (selected?.id === deleteTarget.id) {
-        setSelected(null);
-        setDrawer(null);
-      }
-      setDeleteTarget(null);
-      notify(`Task "${deleteTarget.title}" deleted.`);
-    } catch (error) {
-      notify(error instanceof Error ? error.message : "Task deletion is unavailable.");
-    } finally {
-      setDeleting(false);
-    }
+  async function mutate(action: () => Promise<unknown>, message: string) {
+    if (lock.current) return;
+    lock.current = true; setBusy(true); setFeedback({ message: "", error: false });
+    try { await action(); setFeedback({ message, error: false }); setDrawer(null); }
+    catch (cause) { setFeedback({ message: cause instanceof Error ? cause.message : "The change could not be saved.", error: true }); }
+    finally { lock.current = false; setBusy(false); }
+  }
+  function edit(task: DemoTask) {
+    setSelected(task); setForm({ title: task.title, ownerKey: task.ownerKey, dueDate: task.dueDate, note: task.note, category: task.category, priority: task.priority ?? "Normal", status: task.status }); setDrawer("edit");
+  }
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    const option = options.find((item) => item.value === form.ownerKey);
+    if (!option || !form.title.trim() || !form.dueDate) { setFeedback({ message: "Enter a title, assignee and due date.", error: true }); return; }
+    const payload = { ...form, title: form.title.trim(), owner: option.label };
+    void mutate(() => drawer === "edit" && selected ? updateTask(selected.id, payload) : addTask(payload), drawer === "edit" ? "Task updated" : "Task created");
+  }
+  function exportTasks() {
+    downloadCsv(`maatrucare-tasks-${today}.csv`, ["Title", "Assignee", "Participation", "Due date", "Status", "Category", "Priority", "Note"], visible.map((task) => [task.title, task.owner, task.ownerDemo ? "Simulated" : "Care Circle member", task.dueDate, task.status, task.category === "Patient" ? "Personal" : task.category, task.priority, task.note]));
   }
 
-  async function reassignSelectedTask(task: Task, owner: CaregiverOwner) {
-    try {
-      await reassignTaskAction(task.id, owner);
-      setSelected((current) => current?.id === task.id ? { ...current, owner } : current);
-      setHandoff(null);
-      notify(`Task owner changed to ${owner}. This is not a formal handoff.`);
-    } catch (error) {
-      notify(error instanceof Error ? error.message : "Task reassignment is unavailable.");
-    }
-  }
-
-  const visible = useMemo(() => tasks.filter((task) => {
-    const matchesSearch = `${task.title} ${task.owner} ${task.category}`.toLowerCase().includes(search.toLowerCase());
-    const matchesFilter = filter === "mine" ? task.owner === "Ananya Rao" : filter === "open" ? task.status === "Open" : filter === "completed" ? task.status === "Completed" : true;
-    return matchesSearch && matchesFilter && (category === "All" || task.category === category);
-  }), [tasks, filter, category, search]);
-  const counts = { total: tasks.length, mine: tasks.filter((task) => task.owner === "Ananya Rao").length, open: tasks.filter((task) => task.status === "Open").length, completed: tasks.filter((task) => task.status === "Completed").length };
-
-  return <AppShell><div>
-    <header className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end"><div><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9A9196]">Tasks</p><h1 className="mt-2 text-3xl font-semibold tracking-[-0.03em] text-[#211C1F]">Coordination tasks</h1><p className="mt-2 max-w-xl text-sm leading-6 text-[#756D72]">Keep shared responsibilities clear and up to date.</p></div><button type="button" onClick={() => { setForm(emptyForm); setDrawer("add"); }} className="flex items-center justify-center gap-2 rounded-[13px] bg-[#6D3A5B] px-4 py-2.5 text-xs font-semibold text-white"><Plus size={15} />Add task</button></header>
-    <div className="mt-8 flex gap-4 rounded-[20px] border border-[#E4D7DF] bg-[#F8F2F6] p-5"><CheckSquare size={20} className="mt-0.5 shrink-0 text-[#6D3A5B]" /><div><p className="text-sm font-semibold text-[#211C1F]">Coordination tasks only</p><p className="mt-1 max-w-3xl text-xs leading-5 text-[#756D72]">Tasks in MaatruCare help patients and caregivers coordinate appointments, transport, documents and responsibilities. They do not provide medical treatment instructions.</p></div></div>
-    {toast && <div className="mt-5 flex items-center justify-between gap-3 rounded-[12px] border border-[#CFE0D5] bg-[#F1F8F3] px-3 py-2 text-xs font-medium text-[#3F6D56]"><span className="flex items-center gap-2"><Check size={15} />{toast}</span><Link href="/timeline" className="text-[10px] font-semibold">Open Timeline <ArrowUpRight size={12} className="inline" /></Link></div>}
-    <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{[["Total tasks", counts.total], ["My tasks", counts.mine], ["Open", counts.open], ["Completed", counts.completed]].map(([label, value]) => <div key={String(label)} className="rounded-[18px] border border-[#E9E1E4] bg-white p-5"><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9A9196]">{label}</p><p className="mt-2 text-2xl font-semibold text-[#211C1F]">{value}</p></div>)}</div>
-    <div className="mt-8 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"><div className="flex flex-wrap gap-2">{[["all", "All"], ["mine", "My tasks"], ["open", "Open"], ["completed", "Completed"]].map(([id, label]) => <button key={id} type="button" onClick={() => setFilter(id)} className={`rounded-full px-3.5 py-2 text-[11px] font-semibold ${filter === id ? "bg-[#6D3A5B] text-white" : "border border-[#E9E1E4] bg-white text-[#756D72]"}`}>{label}</button>)}</div><div className="relative w-full lg:max-w-xs"><Search size={15} className="absolute left-3 top-3 text-[#9A9196]" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search tasks..." className="h-10 w-full rounded-[11px] border border-[#E9E1E4] bg-white pl-9 pr-3 text-xs outline-none focus:border-[#6D3A5B]" /></div></div>
-    <div className="mt-3 flex flex-wrap items-center gap-2"><span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9A9196]">Category</span>{["All", ...categories].map((item) => <button key={item} type="button" onClick={() => setCategory(item)} className={`rounded-full px-3 py-1.5 text-[10px] font-semibold ${category === item ? "bg-[#F3EAF0] text-[#6D3A5B]" : "text-[#9A9196]"}`}>{item}</button>)}</div>
-    <section className="mt-5 overflow-hidden rounded-[22px] border border-[#E9E1E4] bg-white"><div className="flex items-center justify-between border-b border-[#F0E9EC] px-6 py-5"><div><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9A9196]">Shared responsibilities</p><h2 className="mt-1 text-[17px] font-semibold text-[#211C1F]">Care Circle tasks</h2></div><span className="rounded-full bg-[#F3EAF0] px-3 py-1.5 text-[11px] font-semibold text-[#6D3A5B]">{visible.length} shown</span></div>{visible.length ? <div className="divide-y divide-[#F0E9EC]">{visible.map((task) => { const Icon = categoryIcons[task.category]; const done = task.status === "Completed"; return <div key={task.id} className="flex flex-wrap items-center gap-3 px-4 py-4 sm:gap-4 sm:px-6"><button type="button" onClick={() => toggleTask(task)} aria-label={`Toggle ${task.title}`} className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border ${done ? "border-[#4F8068] bg-[#E7EEE9] text-[#4F8068]" : "border-[#DCD3D7] text-[#9A9196]"}`}>{done ? <Check size={14} /> : <Circle size={15} />}</button><div className="hidden h-9 w-9 items-center justify-center rounded-[10px] bg-[#FBF8F7] text-[#6D3A5B] sm:flex"><Icon size={16} /></div><button type="button" onClick={() => openTask(task)} className="min-w-0 flex-1 text-left"><p className={`text-[12px] font-semibold ${done ? "text-[#9A9196] line-through" : "text-[#211C1F]"}`}>{task.title}</p><p className="mt-1 text-[10px] text-[#9A9196]">{task.category} · Due {dateLabel(task.dueDate)}</p></button><button
-  type="button"
-  onClick={() => {
-    openTask(task);
-    setEditing(true);
-  }}
-  aria-label={`Edit ${task.title}`}
-  title="Edit task"
-  className="order-last ml-auto inline-flex shrink-0 items-center justify-center gap-1.5 rounded-[10px] border border-[#D8C5D0] bg-[#F8F2F6] px-3 py-2 text-[11px] font-semibold text-[#6D3A5B] transition-colors hover:border-[#6D3A5B] hover:bg-[#F1E5ED] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#6D3A5B]"
->
-  <Pencil size={12} />
-  Edit
-</button>
-<button
-  type="button"
-  onClick={(event) => {
-    event.stopPropagation();
-    setDeleteTarget(task);
-  }}
-  aria-label={`Delete ${task.title}`}
-  title="Delete task"
-  className="order-last inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] text-[#A85562] transition hover:bg-[#FFF5F5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#A85562]"
->
-  <Trash2 size={14} />
-</button>
-<div className="flex flex-wrap items-center gap-2"><span className="flex items-center gap-2 text-[10px]"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#E8D7E0] text-[9px] font-bold text-[#6D3A5B]">{initials(task.owner)}</span>{task.owner}</span><span className="rounded-full bg-[#F5F1F3] px-2.5 py-1 text-[9px] font-semibold text-[#756D72]">{task.category}</span><span className={`rounded-full px-2.5 py-1 text-[9px] font-semibold ${done ? "bg-[#EEF5F0] text-[#4F8068]" : "bg-[#F3EAF0] text-[#6D3A5B]"}`}>{task.status}</span></div></div>; })}</div> : <div className="px-6 py-14 text-center"><Search size={19} className="mx-auto text-[#B86B87]" /><p className="mt-4 text-sm font-semibold text-[#211C1F]">{tasks.length ? "No tasks match this view" : "No tasks yet"}</p><p className="mt-2 text-xs text-[#756D72]">Try another filter or add a coordination task.</p></div>}</section>
-  </div><AnimatePresence>{drawer === "add" && <TaskDrawer title="Add coordination task" form={form} setForm={setForm} onClose={() => setDrawer(null)} onSubmit={addTask} submitLabel="Create task" />}{drawer === "details" && selected && <TaskDrawer title="Task details" form={form} setForm={setForm} task={selected} editing={editing} onEdit={() => setEditing(true)} onClose={() => setDrawer(null)} onSubmit={saveTask} submitLabel="Save changes" onComplete={() => toggleTask(selected)} onHandoff={() => setHandoff(selected)} />}{handoff && <AssignmentDrawer task={handoff} onClose={() => setHandoff(null)} onSave={(owner) => reassignSelectedTask(handoff, owner)} />}{deleteTarget && <DeleteTaskDialog task={deleteTarget} deleting={deleting} onClose={() => setDeleteTarget(null)} onConfirm={() => void confirmDelete()} />}</AnimatePresence></AppShell>;
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="block"><span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9A9196]">{label}</span><div className="mt-2">{children}</div></label>; }
-const inputClass = "w-full rounded-[12px] border border-[#E9E1E4] bg-white px-3 py-2.5 text-xs text-[#211C1F] outline-none focus:border-[#6D3A5B]";
-function TaskDrawer({ title, form, setForm, task, editing = false, onEdit, onComplete, onHandoff, onClose, onSubmit, submitLabel }: { title: string; form: typeof emptyForm; setForm: (form: typeof emptyForm) => void; task?: Task; editing?: boolean; onEdit?: () => void; onComplete?: () => void; onHandoff?: () => void; onClose: () => void; onSubmit: (event: FormEvent) => void; submitLabel: string }) { return <><motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[2px]" /><motion.aside initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }} className="fixed right-0 top-0 z-50 flex h-full w-full max-w-md flex-col border-l border-[#E9E1E4] bg-white shadow-2xl"><div className="flex items-center justify-between border-b border-[#E9E1E4] px-6 py-5"><div><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9A9196]">{task ? "Task details" : "New task"}</p><h2 className="mt-1 text-lg font-semibold text-[#211C1F]">{title}</h2></div><button type="button" onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-full bg-[#F7F3F5] text-[#756D72]"><X size={17} /></button></div>{task && !editing ? <div className="flex flex-1 flex-col"><div className="flex-1 space-y-5 overflow-y-auto px-6 py-6"><Detail label="Owner" value={task.owner} /><Detail label="Category" value={task.category} /><Detail label="Due date" value={dateLabel(task.dueDate)} /><Detail label="Status" value={task.status} /><Detail label="Note" value={task.note} /><Detail label="Created by" value={task.createdBy} /><div className="rounded-[14px] bg-[#F8F2F6] p-4"><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9A9196]">Appointment context</p><p className="mt-2 text-xs font-semibold text-[#211C1F]">No linked appointment</p><p className="mt-1 text-[10px] text-[#756D72]">Link an appointment when available</p></div></div><div className="space-y-2 border-t border-[#E9E1E4] p-6"><div className="grid gap-2 sm:grid-cols-2"><button type="button" onClick={onComplete} className="rounded-[12px] bg-[#6D3A5B] py-3 text-xs font-semibold text-white">{task.status === "Completed" ? "Reopen task" : "Complete task"}</button><button type="button" onClick={onEdit} className="rounded-[12px] border border-[#D8C5D0] py-3 text-xs font-semibold text-[#6D3A5B]">Edit / Reassign</button></div>{task.status === "Open" && <button type="button" onClick={onHandoff} className="w-full rounded-[12px] border border-[#E9E1E4] py-3 text-xs font-semibold text-[#6D3A5B]">Reassign task</button>}</div></div> : <form onSubmit={onSubmit} className="flex flex-1 flex-col"><div className="flex-1 space-y-5 overflow-y-auto px-6 py-6"><Field label="Task title"><input required value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} className={inputClass} /></Field><Field label="Assign to"><select value={form.owner} onChange={(event) => setForm({ ...form, owner: event.target.value as Owner })} className={inputClass}>{owners.map((owner) => <option key={owner}>{owner}</option>)}</select></Field><Field label="Category"><select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value as Category })} className={inputClass}>{categories.map((item) => <option key={item}>{item}</option>)}</select></Field><Field label="Due date"><input required type="date" value={form.dueDate} onChange={(event) => setForm({ ...form, dueDate: event.target.value })} className={inputClass} /></Field><Field label="Optional note"><textarea value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} rows={4} className={`${inputClass} resize-none`} /></Field></div><div className="border-t border-[#E9E1E4] p-6"><button type="submit" className="w-full rounded-[13px] bg-[#6D3A5B] py-3 text-xs font-semibold text-white">{submitLabel}</button></div></form>}</motion.aside></>; }
-function Detail({ label, value }: { label: string; value: string }) { return <div className="border-b border-[#F0E9EC] pb-4"><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9A9196]">{label}</p><p className="mt-2 text-xs leading-5 text-[#211C1F]">{value}</p></div>; }
-function AssignmentDrawer({ task, onClose, onSave }: { task: Task; onClose: () => void; onSave: (owner: CaregiverOwner) => Promise<void> }) {
-  const recipientOptions: CaregiverOwner[] = (["Rahul Rao", "Lakshmi Rao", "Priya Rao"] as const).filter((owner) => owner !== task.owner);
-  const [recipient, setRecipient] = useState<CaregiverOwner>(recipientOptions[0] ?? "Rahul Rao");
-  const [saving, setSaving] = useState(false);
-
-  async function save() {
-    if (saving || recipientOptions.length === 0) return;
-    setSaving(true);
-    try {
-      await onSave(recipient);
-    } finally {
-      setSaving(false);
-    }
-
-  }
-
-  return <><motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[2px]" /><motion.aside initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }} className="fixed right-0 top-0 z-50 flex h-full w-full max-w-md flex-col border-l border-[#E9E1E4] bg-white shadow-2xl"><div className="flex items-center justify-between border-b border-[#E9E1E4] px-6 py-5"><div><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9A9196]">Task assignment</p><h2 className="mt-1 text-lg font-semibold text-[#211C1F]">Reassign responsibility</h2></div><button type="button" aria-label="Close reassignment" onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-full bg-[#F7F3F5] text-[#756D72]"><X size={17} /></button></div><div className="flex-1 space-y-5 px-6 py-6"><Detail label="Current owner" value={task.owner} /><Field label="New owner"><select value={recipient} onChange={(event) => setRecipient(event.target.value as CaregiverOwner)} className={inputClass}>{recipientOptions.map((owner) => <option key={owner} value={owner}>{owner}</option>)}</select></Field><Detail label="Task" value={task.title} /><p className="rounded-[14px] bg-[#F8F2F6] p-4 text-[11px] leading-5 text-[#756D72]">This updates the task owner through the permission-checked backend. It does not create a formal care handoff or acknowledgement.</p></div><div className="border-t border-[#E9E1E4] p-6"><button type="button" disabled={saving || recipientOptions.length === 0} aria-busy={saving} onClick={() => void save()} className="w-full rounded-[13px] bg-[#6D3A5B] py-3 text-xs font-semibold text-white disabled:cursor-wait disabled:opacity-60">{saving ? "Saving assignment…" : "Save new owner"}</button></div></motion.aside></>;
-}
-
-function DeleteTaskDialog({ task, deleting, onClose, onConfirm }: { task: Task; deleting: boolean; onClose: () => void; onConfirm: () => void }) {
-  return <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60] flex items-center justify-center bg-black/25 p-4">
-    <motion.div initial={{ scale: 0.98, y: 6 }} animate={{ scale: 1, y: 0 }} className="w-full max-w-sm rounded-[18px] border border-[#E9E1E4] bg-white p-5 shadow-2xl">
-      <div className="flex items-start gap-3"><div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-[#FFF1F1] text-[#A85562]"><Trash2 size={16} /></div><div><h2 className="text-sm font-semibold text-[#211C1F]">Delete task?</h2><p className="mt-1 text-xs leading-5 text-[#756D72]">“{task.title}” will be removed from coordination tasks. Its existing audit and timeline history will remain protected.</p></div></div>
-      <div className="mt-5 flex gap-2"><button type="button" disabled={deleting} onClick={onClose} className="flex-1 rounded-[11px] border border-[#E9E1E4] py-2.5 text-xs font-semibold text-[#756D72] disabled:opacity-60">Keep task</button><button type="button" disabled={deleting} onClick={onConfirm} className="flex-1 rounded-[11px] bg-[#A85562] py-2.5 text-xs font-semibold text-white disabled:cursor-wait disabled:opacity-60">{deleting ? "Deleting…" : "Delete task"}</button></div>
-    </motion.div>
-  </motion.div>;
+  return <AppShell><PageHeading title="Coordination tasks" description="Clear responsibilities, shared with the people you trust." action={<div className="flex gap-2"><Button variant="secondary" onClick={exportTasks} disabled={!visible.length}><Download size={16} />Export</Button><Button disabled={loading || !canWrite} onClick={() => { setSelected(null); setForm({ ...blank, dueDate: today, ownerKey: ownKey }); setDrawer("create"); }}><Plus size={16} />Add task</Button></div>} />
+    <Message error={feedback.error}>{feedback.message}</Message>
+    {error && <Message error>{error} <button type="button" onClick={() => void refreshData()} className="underline">Retry</button></Message>}
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4"><Stat label="Total tasks" value={loading ? "Loading" : error ? "Unavailable" : tasks.length} /><Stat label="Open responsibilities" value={loading ? "Loading" : error ? "Unavailable" : tasks.filter((task) => task.status !== "Completed").length} detail="Open and in progress" /><Stat label="Completed" value={loading ? "Loading" : error ? "Unavailable" : tasks.filter((task) => task.status === "Completed").length} /><Stat label="Overdue" value={loading ? "Loading" : error ? "Unavailable" : tasks.filter(overdue).length} detail="Due before today and unfinished" /></div>
+    <div className="mt-6 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"><div className="mc-tabs m-0" aria-label="Task filters">{filters.map((item) => <button key={item} type="button" aria-pressed={filter === item} onClick={() => setFilter(item)}>{item}</button>)}</div><label className="relative min-w-0"><Search size={16} className="absolute left-3 top-3 text-[var(--mc-muted)]" /><input aria-label="Search tasks" placeholder="Search responsibilities" value={search} onChange={(event) => setSearch(event.target.value)} className="mc-input pl-10" /></label></div>
+    <Panel title={filter === "All" ? "Your responsibilities" : filter} className="mt-5" description={`${visible.length} matching task${visible.length === 1 ? "" : "s"}`}>
+      {loading ? <p role="status" className="mc-caption">Loading tasks...</p> : !visible.length ? <div className="py-10 text-center"><h3 className="font-semibold">{tasks.length ? "No matching tasks" : "A little clarity starts here"}</h3><p className="mc-caption mt-2">{tasks.length ? "Change the filter or search to find a responsibility." : "Add a responsibility for yourself or an approved caregiver."}</p></div> : <div className="divide-y divide-[var(--mc-border)]">{visible.map((task) => <article key={task.id} className="flex items-start gap-3 py-5 first:pt-0 last:pb-0"><button aria-label={task.status === "Completed" ? `Reopen ${task.title}` : `Complete ${task.title}`} disabled={busy || !canWrite} onClick={() => void mutate(() => completeTask(task.id), task.status === "Completed" ? "Task reopened" : "Task completed")} className="mt-1 text-[var(--mc-success)]">{task.status === "Completed" ? <CheckCircle2 size={22} /> : <Circle size={22} />}</button><div className="min-w-0 flex-1"><button type="button" onClick={() => edit(task)} className={`text-left text-base font-semibold hover:text-[var(--mc-brand)] ${task.status === "Completed" ? "line-through text-[var(--mc-muted)]" : ""}`}>{task.title}</button><div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-[var(--mc-muted)]"><span>{task.owner}</span>{task.ownerDemo && <Badge>Simulated</Badge>}<span>Due {new Date(`${task.dueDate}T12:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span><Badge tone={task.status === "Completed" ? "success" : overdue(task) ? "warning" : "neutral"}>{overdue(task) ? "Overdue" : task.status}</Badge><Badge>{task.category === "Patient" ? "Personal" : task.category}</Badge>{task.priority === "High" && <Badge tone="warning">High priority</Badge>}</div>{task.note && <p className="mc-caption mt-2 whitespace-pre-line">{task.note}</p>}</div><button className="mc-icon-button" aria-label={`Edit ${task.title}`} onClick={() => edit(task)}><Pencil size={16} /></button></article>)}</div>}
+    </Panel>
+    <p className="mc-caption mt-5">Need to transfer a responsibility with acknowledgement? <Link href="/handoffs" className="text-[var(--mc-brand)] underline">Create a care handoff</Link>.</p>
+    {drawer && <Drawer title={drawer === "create" ? "Add coordination task" : "Task details"} onClose={() => { if (!busy) setDrawer(null); }}><form onSubmit={submit}><fieldset disabled={busy || !canWrite}>
+      <Field label="Task title"><input required maxLength={255} value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} autoFocus /></Field>
+      <Field label="Assign to"><select required value={form.ownerKey} onChange={(event) => setForm({ ...form, ownerKey: event.target.value })}>{!options.some((option) => option.value === form.ownerKey) && <option value={form.ownerKey}>Previous assignee - choose an active member</option>}{options.map((option) => <option key={option.value} value={option.value}>{optionLabel(option)}</option>)}</select></Field>
+      <div className="grid grid-cols-2 gap-3"><Field label="Due date"><input required type="date" value={form.dueDate} onChange={(event) => setForm({ ...form, dueDate: event.target.value })} /></Field><Field label="Priority"><select value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value as Form["priority"] })}>{["Low", "Normal", "High"].map((value) => <option key={value}>{value}</option>)}</select></Field></div>
+      <Field label="Category"><select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value as DemoCategory })}>{["Appointment", "Transport", "Patient", "Coordination"].map((value) => <option key={value} value={value}>{value === "Patient" ? "Personal" : value}</option>)}</select></Field>
+      {drawer === "edit" && <Field label="Status"><select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as DemoTaskStatus })}>{["Open", "In progress", "Completed"].map((value) => <option key={value}>{value}</option>)}</select></Field>}
+      <Field label="Supporting note (optional)"><textarea maxLength={2000} value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} /></Field>
+      <Button type="submit" disabled={busy}>{busy ? "Saving..." : "Save task"}</Button>
+      {drawer === "edit" && selected && <Button variant="danger" className="ml-2" disabled={busy} onClick={() => { if (window.confirm(`Delete "${selected.title}"? Its history will be retained.`)) void mutate(() => deleteTask(selected.id), "Task deleted"); }}>Delete task</Button>}
+    </fieldset><Message error={feedback.error}>{feedback.message}</Message></form></Drawer>}
+  </AppShell>;
 }

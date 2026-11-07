@@ -13,7 +13,7 @@ New-Item -ItemType Directory -Force .work\local-demo | Out-Null
 $qaDb = Join-Path $PWD (".work\local-demo\demo-{0}.sqlite3" -f (Get-Date -Format 'yyyyMMdd-HHmmss'))
 $env:DATABASE_URL = "sqlite:///" + ($qaDb -replace '\\', '/')
 $env:AI_PUBLIC_DEMO_MODE = 'false'
-$env:DEMO_ACTOR_CAREGIVER_ID = '1'
+$env:MAATRUCARE_DEMO_CAREGIVERS_ENABLED = 'true'
 Set-Location .\backend
 python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
@@ -26,19 +26,19 @@ Open a second PowerShell terminal at the repository root:
 
 ```powershell
 $env:NEXT_PUBLIC_API_BASE_URL = 'http://127.0.0.1:8000'
-$env:NEXT_PUBLIC_DEMO_ACTOR_CAREGIVER_ID = '1'
+$env:NEXT_PUBLIC_DEMO_CAREGIVERS_ENABLED = 'true'
 Set-Location .\frontend
 npm run dev -- --hostname 127.0.0.1 --port 3000
 ```
 
-Open `http://127.0.0.1:3000`. The frontend should display synthetic seeded content. The preview used for the attached screenshots was pointed explicitly at this local API and a fresh local SQLite file; it did not call Render or Vercel.
+Open `http://127.0.0.1:3000` and sign in only with an authorized test account. The frontend must have its existing `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` configuration, and the backend must have its server-side Supabase token-verification configuration. This workflow uses real authentication against the configured Supabase project; the fresh SQLite file isolates MaatruCare care records, not the Supabase identity provider. Do not enable `MAATRUCARE_TEST_AUTH_COMPAT` or bypass JWT verification to make the demo sign-in work. The preview used for earlier screenshots was pointed explicitly at a local API and a fresh SQLite file; it did not call Render or Vercel.
 
 ## 3. Recommended judge walkthrough
 
 1. **Home (`/`)** — show the dashboard's coordination overview and explain that it is not a clinical assessment or risk score.
 2. **Tasks (`/tasks`)** — create a clearly fictional item such as “Confirm pickup time,” select an available caregiver, save, then edit/reassign or mark it complete. Wait for the server response before describing the change as saved. The task-owner menu is limited to caregivers actually returned by the backend; patient ownership is handled separately by the task data model.
-3. **Care Circle (`/care-circle`) and Consent (`/consent`)** — explain each permission before toggling it. Only an authorized patient controller can change grants. An existing grant can be repeated safely as a no-op; a missing grant can be created by an authorized controller. A denied request must remain denied until the controller explicitly grants access.
-4. **Handoffs (`/handoffs`)** — use a fictional logistical reason (for example, “Confirm who will bring the visit folder”). Select sender and recipient, create the handoff, then acknowledge it as the receiving caregiver. A handoff requires the relevant `Care handoffs` permission; grant it through the controller's consent workflow first if needed. The backend, not the screen alone, determines whether the acknowledgement succeeds.
+3. **Care Circle (`/care-circle`) and Consent (`/consent`)** — explain each permission before toggling it. Only an authorized patient controller can change grants. An existing grant can be repeated safely as a no-op; a missing grant can be created by an authorized controller. A denied request must remain denied until the controller explicitly grants access. For a fictional participant walkthrough, set `MAATRUCARE_DEMO_CAREGIVERS_ENABLED=true` and `NEXT_PUBLIC_DEMO_CAREGIVERS_ENABLED=true` only for this disposable local demo, then use **Add Demo Caregiver**. Demo participants are visibly labeled, have no login account, receive no invitation email, and do not represent real caregiver access.
+4. **Handoffs (`/handoffs`)** — use a fictional logistical reason (for example, “Confirm who will bring the visit folder”). Select sender and recipient, create the handoff, then acknowledge with the real recipient's own linked account, or use the explicitly labeled primary-controller simulation for a demo-only recipient. Simulated actions are audited and appear in the timeline as simulated, never as real caregiver responses. A handoff requires the relevant `Care handoffs` permission; grant it through the controller's consent workflow first if needed. The backend, not the screen alone, determines whether the acknowledgement succeeds.
 5. **AI Assist (`/ai-assist`)** — show a fictional, non-clinical note and explain that the generated text is a draft. Review/edit/reject it before any separate action. The current review buttons record local UI state only; they do not persist a review event, create tasks, or share information.
 6. **Lifestyle (`/lifestyle`)** — demonstrate fictional hydration, sleep, weight, activity, and coordination records only. Explain that the page is not clinical advice or a validated maternal-health assessment. Use the browser's local date and show empty-goal states as “No goal,” not as a zero-percent health result.
 7. **Reset (`/settings`)** — the reset control requires confirmation and only applies when the local backend is started with `MAATRUCARE_DEMO_RESET_ENABLED=true`. Use a newly created synthetic SQLite database only. The reset endpoint still checks the authorized controller and patient-scopes deletion; optional preferences reset is separately selected. After success, use the link to re-open Lifestyle and confirm records have reloaded. Never enable this for production patient data.
@@ -58,7 +58,7 @@ The AI public-demo route is disabled by default. An actual generated summary req
 - Dashboard, Tasks, Care Circle, Handoffs, and Lifestyle display the synthetic data returned by the local API.
 - A successful task mutation updates the task state; a failed request must not be presented as saved.
 - A successful permission action shows the resulting grant state; an unauthorized action shows an error, and a 403 remains an access denial.
-- A successful handoff shows its backend status and, after recipient acknowledgement, the acknowledged state.
+- A successful handoff shows backend status. Real acknowledgement requires the recipient's authenticated account; demo-recipient acknowledgement and completion are explicitly simulated by the primary controller and labeled as simulated in the UI, audit, and timeline.
 - AI Assist shows a draft with a human-review requirement. No AI output should be presented as medical advice or as already approved.
 - A confirmed local Lifestyle reset reports deletion counts, preserves routines/recommendations and unrelated data, and the follow-up link loads the empty or remaining synthetic state from the backend. Reset remains unavailable unless explicitly enabled for that local process.
 
@@ -72,4 +72,4 @@ Stop each local process with `Ctrl+C`. The generated SQLite file is under `.work
 
 ## Known limitations
 
-The production permission row has not been verified. The demo's numeric actor ID and role checks do not establish authenticated identity. Rate limiting is process-local and heuristic note screening is not a privacy guarantee. AI-provider requests were not performed during QA. No feature in this demo is clinically validated, a diagnosis, treatment recommendation, or substitute for a clinician.
+The production permission row has not been verified. The demo's numeric actor ID and role checks do not establish authenticated identity. Rate limiting is process-local and heuristic note screening is not a privacy guarantee. One minimal, fictional Gemini service-layer smoke succeeded on 7 November 2026; the authenticated browser-to-API AI flow and production provider configuration remain unverified. No feature in this demo is clinically validated, a diagnosis, treatment recommendation, or substitute for a clinician.

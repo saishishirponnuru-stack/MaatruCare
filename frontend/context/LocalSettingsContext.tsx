@@ -9,6 +9,8 @@ import {
   type ReactNode,
 } from "react";
 
+import { useAuth } from "@/context/AuthContext";
+
 export interface DemoProfile {
   name: string;
   phone: string;
@@ -49,9 +51,9 @@ const STORAGE_KEY = "maatru-care-demo-local-settings";
 
 const defaults: LocalSettings = {
   profile: {
-    name: "Ananya Rao",
-    phone: "+91 90000 00001",
-    email: "ananya.rao@example.test",
+    name: "",
+    phone: "",
+    email: "",
   },
   carePreferences: {
     preferredLanguage: "English",
@@ -113,12 +115,14 @@ function hydrateSettings(value: unknown): LocalSettings {
 }
 
 export function LocalSettingsProvider({ children }: { children: ReactNode }) {
+  const { account } = useAuth();
+  const storageKey = account ? `${STORAGE_KEY}:${account.subject}` : null;
   const [settings, setSettings] = useState<LocalSettings>(defaults);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
     try {
-      const stored = window.localStorage.getItem(STORAGE_KEY);
+      const stored = storageKey ? window.localStorage.getItem(storageKey) : null;
       if (stored) {
         // Browser-only settings are hydrated after mount to keep server markup stable.
         // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -128,16 +132,16 @@ export function LocalSettingsProvider({ children }: { children: ReactNode }) {
       // Keep the synthetic defaults if browser storage is unavailable or malformed.
     }
     setHydrated(true);
-  }, []);
+  }, [storageKey]);
 
   useEffect(() => {
-    if (!hydrated) return;
+    if (!hydrated || !storageKey) return;
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+      window.localStorage.setItem(storageKey, JSON.stringify(settings));
     } catch {
       // Controls remain usable in memory for this session when storage is unavailable.
     }
-  }, [hydrated, settings]);
+  }, [hydrated, settings, storageKey]);
 
   const saveProfile = useCallback((profile: DemoProfile) => {
     setSettings((current) => ({ ...current, profile }));

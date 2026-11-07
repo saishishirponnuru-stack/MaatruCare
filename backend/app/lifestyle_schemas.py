@@ -1,6 +1,7 @@
 from datetime import date, datetime, time
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from typing import Literal
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class LifestyleBase(BaseModel):
@@ -25,8 +26,8 @@ class WaterCreate(LifestyleBase):
 
 class SleepCreate(LifestyleBase):
     log_date: date
-    status: str
-    duration_hours: float | None = Field(default=None, ge=0, le=24)
+    status: str = "Not recorded"
+    duration_hours: float | None = Field(default=None, gt=0, le=16)
     bedtime: time | None = None
     wake_time: time | None = None
     interruptions: int | None = Field(default=None, ge=0, le=100)
@@ -35,9 +36,21 @@ class SleepCreate(LifestyleBase):
     @field_validator("status")
     @classmethod
     def valid_status(cls, value: str) -> str:
-        if value not in {"Sound and adequate", "Sound but fewer hours", "Disturbed and inadequate", "Restful", "Fair", "Disturbed"}:
+        if value not in {"Sound and adequate", "Sound but fewer hours", "Disturbed and inadequate", "Restful", "Fair", "Disturbed", "Not recorded"}:
             raise ValueError("Unsupported sleep status")
         return value
+
+    @model_validator(mode="after")
+    def valid_duration(self):
+        if (self.bedtime is None) != (self.wake_time is None):
+            raise ValueError("Provide both bedtime and wake-up time")
+        if self.bedtime is not None:
+            minutes = ((self.wake_time.hour * 60 + self.wake_time.minute) - (self.bedtime.hour * 60 + self.bedtime.minute)) % 1440
+            if not 0 < minutes <= 960:
+                raise ValueError("Sleep duration must be greater than zero and no more than 16 hours")
+        elif self.duration_hours is None:
+            raise ValueError("Provide sleep times or a duration")
+        return self
 
 
 class DietRecommendationCreate(LifestyleBase):
@@ -81,11 +94,33 @@ class ActivityRoutineCreate(LifestyleBase):
 class ActivityLogCreate(BaseModel):
     log_date: date
     completed: bool
-    completion_status: str | None = None
+    completion_status: Literal["Completed", "Partially completed", "Missed"] | None = None
     actual_minutes: int | None = Field(default=None, ge=0, le=1440)
     notes: str | None = Field(default=None, max_length=1000)
     missed_reason: str | None = Field(default=None, max_length=1000)
     actor_caregiver_id: int
+
+    @model_validator(mode="after")
+    def consistent_status(self):
+        self.completion_status = self.completion_status or ("Completed" if self.completed else "Missed")
+        self.completed = self.completion_status == "Completed"
+        if self.completion_status == "Missed" and self.actual_minutes:
+            raise ValueError("A missed activity must have zero or no actual minutes")
+        return self
+
+
+class NutritionCreate(LifestyleBase):
+    log_date: date
+    meal_type: Literal["Breakfast", "Lunch", "Dinner", "Snack", "Other"]
+    notes: str | None = Field(default=None, max_length=1000)
+    recommendation_id: int | None = None
+    adherence: Literal["Followed", "Partially followed", "Not followed"] | None = None
+
+    @model_validator(mode="after")
+    def plan_required(self):
+        if self.adherence and not self.recommendation_id:
+            raise ValueError("Select a plan before recording adherence")
+        return self
 
 
 class WeightCreate(LifestyleBase):
@@ -98,13 +133,15 @@ class LifestylePreferenceUpdate(BaseModel):
     patient_id: int = 1
     actor_caregiver_id: int
     water_goal_ml: int | None = Field(default=None, ge=1, le=20000)
-    sleep_goal_minutes: int | None = Field(default=None, ge=1, le=1440)
+    sleep_goal_minutes: int | None = Field(default=None, ge=1, le=960)
 
 
 class LifestyleResetRequest(BaseModel):
     patient_id: int = 1
     actor_caregiver_id: int
     reset_preferences: bool = False
+    confirmed: bool = False
+    expected_counts: dict[str, int] | None = None
 
 
 class LifestyleResetResponse(BaseModel):
@@ -173,6 +210,7 @@ class ActivityRoutineResponse(LifestyleResponseBase):
 
 
 class ActivityLogResponse(LifestyleResponseBase):
+    planned_minutes: int | None = None
     id: int
     routine_id: int
     log_date: date
@@ -202,6 +240,7 @@ class LifestylePreferenceResponse(LifestyleResponseBase):
 
 
 class LifestyleResponse(BaseModel):
+    nutrition: list["NutritionResponse"] = []
     water: list[WaterResponse]
     sleep: list[SleepResponse]
     weight: list[WeightResponse]
@@ -210,3 +249,14 @@ class LifestyleResponse(BaseModel):
     routines: list[ActivityRoutineResponse]
     activity_logs: list[ActivityLogResponse]
     preferences: LifestylePreferenceResponse
+
+
+class NutritionResponse(LifestyleResponseBase):
+    id: int
+    patient_id: int
+    log_date: date
+    meal_type: str
+    notes: str | None
+    recommendation_id: int | None
+    adherence: str | None
+    created_at: datetime

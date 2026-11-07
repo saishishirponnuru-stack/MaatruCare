@@ -58,6 +58,7 @@ def test_lifestyle_get_serializes_all_record_categories_as_json(client: TestClie
     assert response.status_code == 200
     payload = response.json()
     assert set(payload) == {
+    "nutrition",
     "water",
     "sleep",
     "weight",

@@ -1,172 +1,100 @@
 "use client";
 
-import AppShell from "@/components/layout/AppShell";
 import Link from "next/link";
-import { AnimatePresence, motion } from "framer-motion";
-import { type FormEvent, useState } from "react";
-import { Check, CheckCircle2, Clock3, FileText, Plus, ShieldAlert, ShieldCheck, X } from "lucide-react";
-import { useMaatruCareDemo, type DemoHandoff, type DemoHandoffStage, type DemoOwner } from "@/context/MaatruCareDemoContext";
+import { useRef, useState, type FormEvent } from "react";
+import { ArrowRight, Check, Plus } from "lucide-react";
+import AppShell from "@/components/layout/AppShell";
+import { Badge, Button, Drawer, Field, Message, PageHeading, Panel, Stat } from "@/components/ui/ProductUI";
+import { useMaatruCareDemo, type DemoHandoff } from "@/context/MaatruCareDemoContext";
+import { useAuth } from "@/context/AuthContext";
+import { caregiverLabel, displayTimestamp } from "@/lib/coordination";
 
-type CreateForm = { from: DemoOwner; to: DemoOwner; reason: string };
-const people: DemoOwner[] = ["Rahul Rao", "Lakshmi Rao", "Priya Rao"];
-const stages: DemoHandoffStage[] = ["Prepared", "Sent", "Acknowledged", "Completed"];
-const initialForm: CreateForm = { from: "Rahul Rao", to: "Lakshmi Rao", reason: "Appointment coordination" };
-
+const stages = ["Prepared", "Sent", "Acknowledged", "Completed"];
+const blank = { title: "", from: "", to: "", reason: "", context: "", relatedTask: "" };
 export default function HandoffsPage() {
-  const { handoffs, error: apiError, createHandoff: createHandoffAction, sendHandoff, acknowledgeHandoff, completeHandoff } = useMaatruCareDemo();
-  const [selectedId, setSelectedId] = useState("handoff-1");
-  const [modal, setModal] = useState<"review" | "create" | null>(null);
-  const [toast, setToast] = useState("");
-  const [form, setForm] = useState<CreateForm>(initialForm);
-  const selected = handoffs.find((handoff) => handoff.id === selectedId) ?? handoffs[0];
-  const active = handoffs.filter((handoff) => handoff.stage !== "Completed").length;
-  const awaiting = handoffs.filter((handoff) => handoff.stage === "Sent").length;
-  const completed = handoffs.filter((handoff) => handoff.stage === "Completed").length;
+  const { account } = useAuth();
+  const { handoffs, tasks, caregiverRecords, permissions, createHandoff, sendHandoff, acknowledgeHandoff, completeHandoff, removeHandoff, loading, handoffError } = useMaatruCareDemo();
+  const [selectedId, setSelectedId] = useState("");
+  const [filter, setFilter] = useState("All");
+  const [createOpen, setCreateOpen] = useState(false);
+  const [removing, setRemoving] = useState<DemoHandoff | null>(null);
+  const [form, setForm] = useState(blank);
+  const [feedback, setFeedback] = useState({ text: "", error: false });
+  const [busy, setBusy] = useState(false);
+  const lock = useRef(false);
+  const controller = account?.role === "patient";
+  const canCoordinate = controller || Boolean(account?.caregiver_id && permissions[account.caregiver_id]?.["Care handoffs"]);
+  const removed = (item: DemoHandoff) => Boolean(item.archivedAt) || item.stage === "Cancelled";
+  const current = handoffs.filter((item) => !removed(item));
+  const visible = (filter === "History" ? handoffs.filter(removed) : current.filter((item) => filter === "All" || item.stage === filter)).sort((a,b) => Number(b.id) - Number(a.id));
+  const selected = visible.find((item) => item.id === selectedId) ?? visible.find((item) => item.stage !== "Completed") ?? visible[0];
+  const own = { id: account?.caregiver_id ?? undefined, name: account?.name ?? "You", relationship: controller ? "Care Circle owner" : account?.caregiver?.relationship ?? "Caregiver", is_demo: false, email: account?.email ?? null };
+  const senderOptions = [own, ...caregiverRecords.filter((member) => member.is_demo && controller)];
+  const ownerId = account?.patient?.owner_caregiver_id;
+  const ownerOption = !controller && ownerId ? [{ id: ownerId, name: account?.patient?.name ?? "Care Circle owner", relationship: "Care Circle owner", is_demo: false, email: null }] : [];
+  const recipientOptions = [...caregiverRecords, ...ownerOption].filter((member) => String(member.id) !== form.from);
+  const canSend = selected && !removed(selected) && canCoordinate && (selected.fromId === account?.caregiver_id || selected.fromDemo && controller);
+  const recipientShared = selected && (!controller || permissions[selected.toId]?.["Care handoffs"] !== false);
+  const canRespond = selected && !removed(selected) && canCoordinate && recipientShared && (selected.toId === account?.caregiver_id || selected.toDemo && controller);
+  const simulation = Boolean(selected?.toDemo && selected.toId !== account?.caregiver_id);
+  const qualifying = current.filter((item) => ["Acknowledged", "Completed"].includes(item.stage) && !item.toDemo && item.sentAt && item.acknowledgedAt && Date.parse(item.acknowledgedAt) >= Date.parse(item.sentAt));
+  const average = qualifying.length ? qualifying.reduce((sum, item) => sum + (Date.parse(item.acknowledgedAt!) - Date.parse(item.sentAt!)) / 60000, 0) / qualifying.length : null;
+  const count = (number: number) => loading ? "Loading" : handoffError ? "Unavailable" : number;
 
-  function notify(message: string) {
-    setToast(message);
-    window.setTimeout(() => setToast(""), 3000);
+  async function run(action: () => Promise<unknown>, text: string) {
+    if (lock.current) return;
+    lock.current = true; setBusy(true); setFeedback({ text: "", error: false });
+    try { await action(); setFeedback({ text, error: false }); }
+    catch (cause) { setFeedback({ text: cause instanceof Error ? cause.message : "The handoff could not be updated", error: true }); }
+    finally { lock.current = false; setBusy(false); }
   }
-
-  async function acceptHandoff() {
-    if (!selected) return;
-    try { await acknowledgeHandoff(selected.id); setModal(null); notify("Handoff acknowledgement saved."); }
-    catch (error) { notify(error instanceof Error ? error.message : "Unable to acknowledge handoff."); }
-  }
-
-  async function completeSelectedHandoff() {
-    if (!selected) return;
-    try { await completeHandoff(selected.id); notify("Handoff completion saved."); }
-    catch (error) { notify(error instanceof Error ? error.message : "Unable to complete handoff."); }
-  }
-
-  async function sendSelectedHandoff() {
-    if (!selected) return;
-    try { await sendHandoff(selected.id); notify("Handoff sent."); }
-    catch (error) { notify(error instanceof Error ? error.message : "Unable to send handoff."); }
-  }
-
-  async function createHandoff(event: FormEvent<HTMLFormElement>) {
+  function create(event: FormEvent) {
     event.preventDefault();
-    if (form.from === form.to) {
-      notify("Choose two different caregivers for this handoff.");
-      return;
+    if (!form.title.trim() || !form.reason.trim() || !form.from || !form.to || form.from === form.to) {
+      setFeedback({ text: "Enter a title, responsibility and two different participants.", error: true }); return;
     }
-    try {
-      const id = await createHandoffAction({ title: "Coordination handoff", ...form });
-      setSelectedId(id);
-      setModal(null);
-      setForm(initialForm);
-      notify("Handoff created.");
-    } catch (error) {
-      notify(error instanceof Error ? error.message : "Unable to create handoff.");
-    }
+    void run(async () => {
+      const id = await createHandoff({ title: form.title.trim(), reason: form.reason.trim(), fromId: Number(form.from), toId: Number(form.to), context: form.context.trim() || undefined, relatedTaskId: form.relatedTask ? Number(form.relatedTask) : undefined });
+      setFilter("All"); setSelectedId(id); setCreateOpen(false);
+    }, "Handoff prepared");
   }
 
-  return (
-    <AppShell>
-      <div>
-        <header className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9A9196]">Care coordination</p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-[-0.03em] text-[#211C1F]">Care handoffs</h1>
-            <p className="mt-2 max-w-xl text-sm leading-6 text-[#756D72]">Track responsibility handoffs between members of your care team.</p>
-          </div>
-          <button type="button" onClick={() => setModal("create")} className="flex items-center justify-center gap-2 rounded-[13px] bg-[#6D3A5B] px-4 py-2.5 text-xs font-semibold text-white"><Plus size={15} />Create handoff</button>
-        </header>
-
-        <div className="mt-6 flex gap-4 rounded-[20px] border border-[#E4D7DF] bg-[#F8F2F6] p-5">
-          <ShieldCheck size={19} className="mt-0.5 shrink-0 text-[#6D3A5B]" />
-          <p className="self-center text-xs leading-5 text-[#756D72]">Handoffs record participants, reason, status, and timestamps. Permission checks remain server-enforced.</p>
-        </div>
-
-        {toast && <div role="status" className="mt-5 rounded-[12px] border border-[#CFE0D5] bg-[#F1F8F3] px-3 py-2 text-xs font-medium text-[#3F6D56]">{toast}</div>}
-        {apiError && <div role="alert" className="mt-5 rounded-[12px] border border-[#E7C8CC] bg-[#FFF5F5] px-3 py-2 text-xs font-medium text-[#9D4B55]">{apiError}</div>}
-
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <Kpi label="Active" value={active} />
-          <Kpi label="Awaiting acknowledgement" value={awaiting} />
-          <Kpi label="Completed" value={completed} />
-          <Kpi label="Total handoffs" value={handoffs.length} />
-        </div>
-
-        {selected ? <HandoffCard handoff={selected} onSend={sendSelectedHandoff} onReview={() => setModal("review")} onComplete={completeSelectedHandoff} /> : <div className="mt-8 rounded-[18px] border border-dashed border-[#D8C5D0] bg-white p-8 text-center"><p className="text-sm font-semibold text-[#211C1F]">No handoffs are currently loaded</p><p className="mt-2 text-xs text-[#756D72]">Create a handoff only if the backend list loaded successfully.</p></div>}
-
-        <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_0.75fr]">
-          <section>
-            <div className="flex items-end justify-between gap-4"><div><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9A9196]">Completed records</p><h2 className="mt-1 text-[17px] font-semibold text-[#211C1F]">Completed handoffs</h2></div><span className="text-[10px] text-[#9A9196]">Backend records · not a separate audit log</span></div>
-            <div className="mt-4 rounded-[18px] border border-[#E9E1E4] bg-white px-5">{handoffs.filter((handoff) => handoff.stage === "Completed").map((handoff) => <HistoryRow key={handoff.id} title={handoff.title} people={`${handoff.from} → ${handoff.to}`} date={`Created ${handoff.created}`} />)}{completed === 0 && <p className="py-5 text-xs text-[#9A9196]">No completed handoffs yet.</p>}</div>
-          </section>
-          <div className="space-y-6">
-            <section className="rounded-[18px] border border-[#E4D7DF] bg-[#F8F2F6] p-5">
-              <div className="flex items-center gap-3"><ShieldCheck size={18} className="text-[#6D3A5B]" /><h2 className="text-sm font-semibold text-[#211C1F]">Sharing permissions</h2></div>
-              <p className="mt-3 text-[11px] leading-5 text-[#756D72]">Backend permission checks remain authoritative. This screen does not grant access by displaying labels.</p>
-              <div className="mt-4 flex flex-wrap gap-3 text-[10px] font-semibold text-[#6D3A5B]"><Link href="/consent">Review Consent</Link><Link href="/care-circle">View Care Circle</Link><Link href="/timeline">View Timeline</Link></div>
-            </section>
-            <section className="rounded-[18px] border border-[#E9E1E4] bg-white p-5">
-              <div className="flex items-center gap-3"><Clock3 size={17} className="text-[#6D3A5B]" /><h2 className="text-sm font-semibold text-[#211C1F]">Care Handoff Lag</h2></div>
-              <p className="mt-3 text-[11px] leading-5 text-[#756D72]">Time between responsibility changing and receiving-caregiver acknowledgement.</p>
-              <span className="mt-3 inline-block rounded-full bg-[#FBF8F7] px-2.5 py-1 text-[9px] font-semibold text-[#9A9196]">Metric available after acknowledgement</span>
-            </section>
-          </div>
-        </div>
-
-        <div className="mt-6 flex gap-3 rounded-[16px] bg-[#FBF8F7] p-4"><ShieldAlert size={16} className="mt-0.5 shrink-0 text-[#6D3A5B]" /><p className="text-[11px] leading-5 text-[#756D72]">MaatruCare coordinates responsibilities. It does not diagnose, predict medical risk, recommend treatment, or make clinical decisions.</p></div>
-      </div>
-
-      <AnimatePresence>
-        {modal && <HandoffModal mode={modal} selected={selected} form={form} setForm={setForm} onClose={() => setModal(null)} onAccept={acceptHandoff} onCreate={createHandoff} />}
-      </AnimatePresence>
-    </AppShell>
-  );
-}
-
-function Kpi({ label, value }: { label: string; value: number }) {
-  return <div className="rounded-[18px] border border-[#E9E1E4] bg-white p-5"><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9A9196]">{label}</p><p className="mt-2 text-2xl font-semibold text-[#211C1F]">{value}</p></div>;
-}
-
-function Person({ label, name }: { label: string; name: DemoOwner }) {
-  return <div><p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-[#9A9196]">{label}</p><div className="mt-3 flex items-center gap-3"><div aria-hidden="true" className="flex h-10 w-10 items-center justify-center rounded-full bg-[#E8D7E0] text-[11px] font-semibold text-[#6D3A5B]">{name.split(" ").map((part) => part[0]).join("")}</div><p className="text-xs font-semibold text-[#211C1F]">{name}</p></div></div>;
-}
-
-function HandoffCard({ handoff, onSend, onReview, onComplete }: { handoff: DemoHandoff; onSend: () => void; onReview: () => void; onComplete: () => void }) {
-  const current = stages.indexOf(handoff.stage);
-  return (
-    <section className="mt-8 rounded-[22px] border border-[#E9E1E4] bg-white shadow-[0_8px_30px_rgba(33,28,31,0.035)]">
-      <div className="flex flex-col gap-3 border-b border-[#F0E9EC] px-6 py-5 sm:flex-row sm:items-start sm:justify-between"><div><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9A9196]">{handoff.stage === "Completed" ? "Completed handoff" : "Active handoff"}</p><h2 className="mt-1 text-[20px] font-semibold text-[#211C1F]">{handoff.title}</h2></div><span className="w-fit rounded-full bg-[#F3EAF0] px-3 py-1.5 text-[10px] font-semibold text-[#6D3A5B]">{handoff.stage === "Sent" ? "Awaiting acknowledgement" : handoff.stage}</span></div>
-      <div className="grid gap-8 px-6 py-6 xl:grid-cols-[1fr_1.1fr]">
-        <div>
-          <div className="grid gap-5 sm:grid-cols-2"><Person label="From" name={handoff.from} /><Person label="To" name={handoff.to} /></div>
-          <div className="mt-6 rounded-[16px] bg-[#FBF8F7] p-4"><p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-[#9A9196]">Reason</p><p className="mt-2 text-xs text-[#211C1F]">{handoff.reason}</p></div>
-          <p className="mt-5 flex items-center gap-1.5 text-[10px] text-[#9A9196]"><Clock3 size={13} />Created {handoff.created}</p>
-          <div className="mt-6 flex flex-wrap gap-2">{handoff.stage === "Prepared" && <button type="button" onClick={onSend} className="rounded-[13px] bg-[#6D3A5B] px-4 py-3 text-xs font-semibold text-white">Send handoff</button>}{handoff.stage === "Sent" && <button type="button" onClick={onReview} className="rounded-[13px] bg-[#6D3A5B] px-4 py-3 text-xs font-semibold text-white">Review handoff</button>}{handoff.stage === "Acknowledged" && <button type="button" onClick={onComplete} className="rounded-[13px] bg-[#6D3A5B] px-4 py-3 text-xs font-semibold text-white">Mark coordination complete</button>}</div>
-          {handoff.stage === "Acknowledged" && <p className="mt-4 flex items-center gap-2 text-xs font-medium text-[#4F8068]"><CheckCircle2 size={15} />Acknowledgement recorded for {handoff.to}.</p>}
-        </div>
-        <div className="rounded-[18px] border border-[#F0E9EC] bg-[#FFFCFB] p-5"><div className="flex items-center gap-2"><FileText size={15} className="text-[#6D3A5B]" /><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9A9196]">Stored handoff fields</p></div><p className="mt-4 text-xs leading-5 text-[#756D72]">Participants, reason, status, and timestamps come from the backend. Appointment details, related tasks, and approved context are not attached to this record.</p></div>
-      </div>
-      <div className="border-t border-[#F0E9EC] px-6 py-6"><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9A9196]">Handoff progress</p><div className="mt-5 grid gap-4 sm:grid-cols-4">{stages.map((stage, index) => <div key={stage} className="flex items-center gap-2 sm:block"><div className={`flex h-6 w-6 items-center justify-center rounded-full border text-[10px] font-semibold ${index < current || handoff.stage === "Completed" ? "border-[#4F8068] bg-[#E7EEE9] text-[#4F8068]" : index === current ? "border-[#6D3A5B] bg-[#F3EAF0] text-[#6D3A5B]" : "border-[#E2D9DD] text-[#9A9196]"}`}>{index < current || handoff.stage === "Completed" ? <Check size={12} /> : index + 1}</div><p className={`text-[10px] sm:mt-2 ${index === current ? "font-semibold text-[#6D3A5B]" : "text-[#9A9196]"}`}>{stage}</p></div>)}</div></div>
-    </section>
-  );
-}
-
-function HistoryRow({ title, people, date }: { title: string; people: string; date: string }) {
-  return <div className="flex items-center gap-4 border-b border-[#F0E9EC] py-4 last:border-0"><CheckCircle2 size={18} className="text-[#4F8068]" /><div className="min-w-0 flex-1"><p className="text-xs font-semibold text-[#211C1F]">{title}</p><p className="mt-1 text-[10px] text-[#756D72]">{people}</p></div><span className="text-[10px] text-[#9A9196]">{date}</span></div>;
-}
-
-function HandoffModal({ mode, selected, form, setForm, onClose, onAccept, onCreate }: { mode: "review" | "create"; selected: DemoHandoff | undefined; form: CreateForm; setForm: (form: CreateForm) => void; onClose: () => void; onAccept: () => void; onCreate: (event: FormEvent<HTMLFormElement>) => void }) {
-  return <>
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[2px]" />
-    <motion.aside role="dialog" aria-modal="true" aria-labelledby="handoff-dialog-title" initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }} className="fixed right-0 top-0 z-50 flex h-full w-full max-w-md flex-col border-l border-[#E9E1E4] bg-white shadow-2xl">
-      <div className="flex items-center justify-between border-b border-[#E9E1E4] px-6 py-5"><div><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9A9196]">{mode === "create" ? "New handoff" : "Receiving caregiver review"}</p><h2 id="handoff-dialog-title" className="mt-1 text-lg font-semibold text-[#211C1F]">{mode === "create" ? "Prepare handoff" : selected?.title ?? "Review handoff"}</h2></div><button type="button" onClick={onClose} aria-label="Close handoff dialog" className="flex h-9 w-9 items-center justify-center rounded-full bg-[#F7F3F5] text-[#756D72]"><X size={17} /></button></div>
-      {mode === "review" && selected ? <div className="flex flex-1 flex-col"><div className="flex-1 space-y-5 overflow-y-auto px-6 py-6"><Person label="From" name={selected.from} /><Person label="To" name={selected.to} /><Info label="Reason" value={selected.reason} /><div className="rounded-[14px] bg-[#F8F2F6] p-4"><p className="text-xs font-semibold text-[#211C1F]">Request changes is unavailable</p><p className="mt-2 text-[11px] leading-5 text-[#756D72]">The backend has no request-changes endpoint. This review view also contains no attached appointment or task context.</p></div></div><div className="grid gap-2 border-t border-[#E9E1E4] p-6 sm:grid-cols-2"><button type="button" onClick={onAccept} className="rounded-[12px] bg-[#6D3A5B] py-3 text-xs font-semibold text-white">Acknowledge handoff</button><button type="button" onClick={onClose} className="rounded-[12px] border border-[#E9E1E4] py-3 text-xs font-semibold text-[#6D3A5B]">Close</button></div></div> : <form onSubmit={onCreate} className="flex min-h-0 flex-1 flex-col"><div className="flex-1 space-y-5 overflow-y-auto px-6 py-6"><SelectField label="From" value={form.from} options={people} onChange={(value) => setForm({ ...form, from: value as DemoOwner })} /><SelectField label="To" value={form.to} options={people} onChange={(value) => setForm({ ...form, to: value as DemoOwner })} /><SelectField label="Reason" value={form.reason} options={["Appointment coordination", "Transport coordination", "Document coordination", "General caregiver support"]} onChange={(value) => setForm({ ...form, reason: value })} /><div className="rounded-[14px] bg-[#F8F2F6] p-4 text-[11px] leading-5 text-[#756D72]">Only participants, reason, and workflow status are persisted. Related tasks, appointment details, and sharing context are not stored on a handoff record.</div></div><div className="border-t border-[#E9E1E4] p-6"><button type="submit" className="w-full rounded-[13px] bg-[#6D3A5B] py-3 text-xs font-semibold text-white">Create handoff</button></div></form>}
-    </motion.aside>
-  </>;
-}
-
-function Info({ label, value }: { label: string; value: string }) {
-  return <div><p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-[#9A9196]">{label}</p><p className="mt-2 whitespace-pre-line text-xs leading-5 text-[#211C1F]">{value}</p></div>;
-}
-
-function SelectField({ label, value, options, onChange }: { label: string; value: string; options: readonly string[]; onChange: (value: string) => void }) {
-  return <label className="block"><span className="text-[10px] font-semibold uppercase tracking-[0.13em] text-[#9A9196]">{label}</span><select value={value} onChange={(event) => onChange(event.target.value)} className="mt-2 w-full rounded-[12px] border border-[#E9E1E4] px-3 py-2.5 text-xs outline-none focus:border-[#6D3A5B]">{options.map((option) => <option key={option}>{option}</option>)}</select></label>;
+  return <AppShell><PageHeading title="Care handoffs" description="Keep each responsibility clear as it passes from one person to another." action={<Button disabled={!canCoordinate || loading || busy} onClick={() => { setFeedback({text:"",error:false}); setForm({ ...blank, from: String(account?.caregiver_id ?? "") }); setCreateOpen(true); }}><Plus size={16} />Create handoff</Button>} />
+    <Message error={feedback.error}>{feedback.text}</Message><Message error>{handoffError}</Message>
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4"><Stat label="Total handoffs" value={count(current.length)} detail="Excludes cancelled and archived" /><Stat label="Awaiting acknowledgement" value={count(current.filter((item) => item.stage === "Sent").length)} /><Stat label="Acknowledged" value={count(current.filter((item) => item.stage === "Acknowledged").length)} /><Stat label="Completed" value={count(current.filter((item) => item.stage === "Completed").length)} /></div>
+    <div className="mc-tabs" aria-label="Handoff status filters">{["All", ...stages, "History"].map((stage) => <button key={stage} type="button" aria-pressed={filter === stage} onClick={() => setFilter(stage)}>{stage === "Sent" ? "Awaiting acknowledgement" : stage === "History" ? "Cancelled & archived" : stage}</button>)}</div>
+    <div className="grid items-start gap-5 xl:grid-cols-[minmax(220px,0.6fr)_minmax(0,1.4fr)]"><Panel title={filter === "History" ? "Retained history" : "Responsibilities"}>
+      {loading ? <p role="status" className="mc-caption">Loading handoffs...</p> : !visible.length ? <div className="py-5"><h3 className="font-semibold">{filter === "History" ? "Nothing removed yet" : "No handoffs in this view"}</h3><p className="mc-caption mt-2">{filter === "History" ? "Cancelled and archived handoffs remain available here." : "Prepare a handoff when someone else needs to take responsibility."}</p></div> : <div className="space-y-3">{visible.map((item) => <button key={item.id} type="button" aria-pressed={selected?.id === item.id} onClick={() => setSelectedId(item.id)} className={`w-full rounded-xl border p-4 text-left transition ${selected?.id === item.id ? "border-[var(--mc-brand)] bg-[var(--mc-surface-muted)]" : "border-[var(--mc-border)] hover:bg-[var(--mc-surface-muted)]"}`}><span className="block break-words font-semibold">{item.title}</span><span className="mc-caption mt-1 block">To {item.to}</span><span className="mt-3 flex flex-wrap gap-2"><Badge tone={item.stage === "Completed" ? "success" : "neutral"}>{item.archivedAt ? "Archived" : item.stage === "Sent" ? "Awaiting acknowledgement" : item.stage}</Badge>{(item.toDemo || item.fromDemo) && <Badge>Simulated</Badge>}</span></button>)}</div>}
+    </Panel>
+    {selected ? <Panel title={selected.title} action={<Badge tone={selected.stage === "Completed" ? "success" : "neutral"}>{selected.archivedAt ? "Archived" : selected.stage === "Sent" ? "Awaiting acknowledgement" : selected.stage}</Badge>}>
+      <p className="mb-5 whitespace-pre-line text-sm leading-7">{selected.reason}</p>
+      <div className="mb-6 flex flex-wrap items-center gap-4 rounded-xl bg-[var(--mc-surface-muted)] p-4"><div><p className="mc-caption">From</p><p className="font-semibold">{selected.from}</p>{selected.fromDemo && <Badge>Simulated</Badge>}</div><ArrowRight size={18} aria-hidden="true" className="text-[var(--mc-muted)]" /><div><p className="mc-caption">To</p><p className="font-semibold">{selected.to}</p>{selected.toDemo && <Badge>Simulated</Badge>}</div></div>
+      {selected.context && <div className="mb-5"><h3 className="text-sm font-semibold">Context</h3><p className="mc-caption mt-2 whitespace-pre-line">{selected.context}</p></div>}
+      {selected.relatedTaskId && <p className="mc-caption mb-5">Related task: <Link href="/tasks" className="underline">{tasks.find((item) => Number(item.id) === selected.relatedTaskId)?.title ?? "View task"}</Link></p>}
+      <ol className="grid grid-cols-2 gap-5 border-y border-[var(--mc-border)] py-6 sm:grid-cols-4" aria-label="Handoff progress">{stages.map((stage,index) => {
+        const position = stages.indexOf(selected.stage); const done = index < position || selected.stage === "Completed";
+        const timestamp = [selected.createdAt,selected.sentAt,selected.acknowledgedAt,selected.completedAt][index];
+        return <li key={stage} aria-current={!removed(selected) && index === position ? "step" : undefined}><span className={`mb-2 flex h-8 w-8 items-center justify-center rounded-full border text-sm ${done || removed(selected) && timestamp ? "border-[var(--mc-success)] text-[var(--mc-success)]" : index === position && !removed(selected) ? "border-[var(--mc-brand)] text-[var(--mc-brand)]" : "border-[var(--mc-border)] text-[var(--mc-muted)]"}`}>{done || removed(selected) && timestamp ? <Check size={16} /> : index + 1}</span><p className="text-sm font-semibold">{stage}</p>{timestamp && <time className="mc-caption mt-1 block">{displayTimestamp(timestamp)}</time>}</li>;
+      })}</ol>
+      {removed(selected) ? <p className="mc-caption mt-5">{selected.archivedAt ? "Archived" : "Cancelled"} {displayTimestamp(selected.archivedAt ?? selected.cancelledAt)}. History is retained.</p> : <div className="mt-6">
+        <div className="flex flex-wrap items-center gap-3">{selected.stage === "Prepared" && canSend && <Button disabled={busy} onClick={() => void run(() => sendHandoff(selected.id), "Handoff sent")}>Send handoff</Button>}{selected.stage === "Sent" && canRespond && <Button disabled={busy} onClick={() => void run(() => acknowledgeHandoff(selected.id), simulation ? "Simulated acknowledgement recorded" : "Handoff acknowledged")}>{simulation ? "Acknowledge (simulation)" : "Acknowledge"}</Button>}{selected.stage === "Acknowledged" && canRespond && <Button disabled={busy} onClick={() => void run(() => completeHandoff(selected.id), simulation ? "Simulated completion recorded" : "Handoff completed")}>{simulation ? "Complete (simulation)" : "Complete handoff"}</Button>}{controller && <Button variant="secondary" disabled={busy} onClick={() => setRemoving(selected)}>{selected.stage === "Completed" ? "Archive handoff" : "Cancel handoff"}</Button>}</div>
+        {simulation && canRespond && ["Sent","Acknowledged"].includes(selected.stage) && <p className="mc-caption mt-3">Simulated action - no caregiver account is involved.</p>}
+        {controller && !recipientShared && ["Prepared","Sent","Acknowledged"].includes(selected.stage) && <p className="mc-caption mt-3">Enable Care handoffs sharing for {selected.to} in <Link href="/consent" className="underline">Consent & sharing</Link> to continue.</p>}
+        {!simulation && selected.stage === "Sent" && !canRespond && <p className="mc-caption mt-3">Waiting for {selected.to} to acknowledge.</p>}
+      </div>}
+    </Panel> : <Panel title="A clear next step"><p className="mc-caption">Choose a handoff to see the responsibility, its progress and the next available action.</p></Panel>}
+    </div>
+    <p className="mc-caption mt-5">Average real acknowledgement: {average === null ? "Not enough records yet" : average < 1 ? "Under 1 minute" : `${Math.round(average)} minutes`}. <Link href="/timeline" className="underline">View activity</Link></p>
+    {createOpen && <Drawer title="Prepare a handoff" onClose={() => { if (!busy) setCreateOpen(false); }}><form onSubmit={create}><fieldset disabled={busy}>
+      <Field label="Handoff title"><input required maxLength={255} value={form.title} onChange={(event) => setForm({...form,title:event.target.value})} autoFocus /></Field>
+      <Field label="From"><select required value={form.from} onChange={(event) => setForm({...form,from:event.target.value,to:event.target.value===form.to?"":form.to})}>{senderOptions.map((member) => <option key={member.id} value={member.id}>{caregiverLabel(member,caregiverRecords)}</option>)}</select></Field>
+      <Field label="Receiving caregiver"><select required value={form.to} onChange={(event) => setForm({...form,to:event.target.value})}><option value="">Choose a caregiver</option>{recipientOptions.map((member) => <option key={member.id} value={member.id} disabled={controller && permissions[member.id]?.["Care handoffs"]===false}>{caregiverLabel(member,caregiverRecords)}{controller && permissions[member.id]?.["Care handoffs"]===false?" - Sharing off":""}</option>)}</select></Field>
+      <Field label="Responsibility / reason"><textarea required maxLength={2000} value={form.reason} onChange={(event) => setForm({...form,reason:event.target.value})} /></Field>
+      <Field label="Context (optional)"><textarea maxLength={2000} value={form.context} onChange={(event) => setForm({...form,context:event.target.value})} /></Field>
+      {tasks.length>0 && <Field label="Related task (optional)"><select value={form.relatedTask} onChange={(event) => setForm({...form,relatedTask:event.target.value})}><option value="">No linked task</option>{tasks.map((task) => <option key={task.id} value={task.id}>{task.title}</option>)}</select></Field>}
+      {controller && <p className="mc-caption mb-4">Sharing off? Enable the caregiver&apos;s handoff access in <Link href="/consent" className="underline">Consent & sharing</Link>.</p>}
+      <Button type="submit" disabled={busy}>{busy?"Preparing...":"Prepare handoff"}</Button>
+    </fieldset><Message error={feedback.error}>{feedback.text}</Message></form></Drawer>}
+    {removing && <Drawer title={removing.stage === "Completed" ? "Archive this handoff?" : "Cancel this handoff?"} onClose={() => { if (!busy) setRemoving(null); }}><p className="text-sm leading-7">Remove &quot;{removing.title}&quot; from your active responsibilities? Its history will be retained.</p><div className="mt-6 flex flex-wrap gap-3"><Button variant="secondary" disabled={busy} onClick={() => setRemoving(null)}>Keep handoff</Button><Button variant="danger" disabled={busy} onClick={() => void run(async () => {await removeHandoff(removing.id);setRemoving(null);},removing.stage === "Completed" ? "Handoff archived. Its history is retained." : "Handoff cancelled. Its history is retained.")}>{busy?"Saving...":removing.stage === "Completed"?"Confirm archive":"Confirm cancellation"}</Button></div><Message error={feedback.error}>{feedback.text}</Message></Drawer>}
+  </AppShell>;
 }

@@ -12,11 +12,13 @@ import {
   ArrowLeftRight,
   ShieldCheck,
   Activity,
+  Sparkles,
   Settings,
   X,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import type { RefObject } from "react";
+import SignOutButton from "@/components/auth/SignOutButton";
 
 const navigation = [
   { label: "Home", href: "/dashboard", icon: Home, iconTone: "slate" },
@@ -27,6 +29,7 @@ const navigation = [
   { label: "Handoffs", href: "/handoffs", icon: ArrowLeftRight, iconTone: "indigo" },
   { label: "Consent", href: "/consent", icon: ShieldCheck, iconTone: "teal" },
   { label: "Lifestyle", href: "/lifestyle", icon: Activity, iconTone: "hydration" },
+  { label: "AI Assist", href: "/ai-assist", icon: Sparkles, iconTone: "violet", special: true },
 ];
 
 interface SidebarProps {
@@ -90,9 +93,9 @@ export default function Sidebar({
             return (
               <Link key={item.href} href={item.href} onClick={handleNavigate} aria-current={active ? "page" : undefined}>
                 <motion.div
-                  whileHover={{ x: 2 }}
-                  transition={{ duration: 0.15 }}
                   className={`relative flex min-h-11 items-center gap-3 rounded-[12px] px-3 text-[14px] font-medium transition-colors ${
+                    item.special ? `mc-ai-nav-item ${active ? "mc-ai-nav-item-active" : ""}` : ""
+                  } ${
                     active
                       ? "bg-[var(--mc-surface-muted)] text-[var(--mc-brand)]"
                       : "text-[var(--mc-muted)] hover:bg-[var(--mc-background)] hover:text-[var(--mc-text)]"
@@ -106,7 +109,7 @@ export default function Sidebar({
                   )}
 
                   <span className={`mc-feature-icon mc-feature-icon--${item.iconTone} flex h-7 w-7 items-center justify-center rounded-[9px]`}><Icon size={16} strokeWidth={active ? 2.3 : 1.9} aria-hidden="true" /></span>
-                  <span>{item.label}</span>
+                  <span className="relative z-10">{item.label}</span>
                 </motion.div>
               </Link>
             );
@@ -117,7 +120,6 @@ export default function Sidebar({
       <div className="shrink-0 border-t border-[var(--mc-border)] px-4 py-4">
         <Link href="/settings" onClick={handleNavigate}>
           <motion.div
-            whileHover={{ x: 2 }}
             className={`flex min-h-11 items-center gap-3 rounded-[12px] px-3 text-[14px] font-medium transition-colors ${
               pathname.startsWith("/settings")
                 ? "bg-[var(--mc-surface-muted)] text-[var(--mc-brand)]"
@@ -128,12 +130,13 @@ export default function Sidebar({
             <span>Settings</span>
           </motion.div>
         </Link>
+        <SignOutButton className="mt-2 flex min-h-10 w-full items-center rounded-[12px] px-3 text-left text-xs font-medium text-[var(--mc-muted)] transition hover:bg-[var(--mc-background)] hover:text-[var(--mc-text)]" />
 
         <div className="mt-3 rounded-[14px] bg-[var(--mc-background)] p-3 lg:mt-4">
           <div className="flex items-center gap-2">
             <div className="h-2 w-2 shrink-0 rounded-full bg-[#9A9196]" />
             <span className="text-[11px] font-medium text-[var(--mc-muted)]">
-              Patient-controlled care
+              Your care, connected
             </span>
           </div>
         </div>
@@ -155,7 +158,7 @@ export default function Sidebar({
         aria-hidden={!mobileOpen}
         disabled={!mobileOpen}
         onClick={onClose}
-        className={`fixed inset-0 z-40 bg-[#211C1F]/25 backdrop-blur-[2px] transition-opacity duration-200 lg:hidden ${
+        className={`fixed inset-0 z-40 bg-[#211C1F]/25 transition-opacity duration-200 lg:hidden ${
           mobileOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
         }`}
       />
@@ -169,7 +172,7 @@ export default function Sidebar({
         aria-label="Mobile navigation"
         aria-hidden={!mobileOpen}
         inert={!mobileOpen}
-        className={`fixed left-0 top-0 z-50 flex h-[100dvh] w-[min(86vw,320px)] flex-col border-r border-[var(--mc-border)] bg-[var(--mc-surface)] shadow-[12px_0_40px_rgba(33,28,31,0.12)] transition-transform duration-250 ease-out lg:hidden ${
+        className={`mc-mobile-sidebar fixed left-0 top-0 z-50 flex h-[100dvh] w-[min(86vw,320px)] flex-col border-r border-[var(--mc-border)] bg-[var(--mc-surface)] shadow-[12px_0_40px_rgba(33,28,31,0.12)] transition-transform duration-250 ease-out lg:hidden ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >

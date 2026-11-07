@@ -120,7 +120,7 @@ export default function CareCirclePreview() {
       {/* Privacy note */}
       <div className="mt-5 rounded-[14px] bg-[#FBF8F7] px-4 py-3">
         <p className="text-[10px] font-semibold uppercase tracking-[0.11em] text-[#9A9196]">
-          Patient-controlled access
+          Sharing on your terms
         </p>
 
         <p className="mt-1.5 text-[11px] leading-5 text-[#756D72]">

@@ -44,3 +44,27 @@ def test_water_delete_is_owner_controlled_and_persistent(client: TestClient) -> 
     assert deleted.status_code == 200
     payload = client.get("/api/lifestyle?patient_id=1&actor_caregiver_id=1").json()
     assert all(item["id"] != record_id for item in payload["water"])
+
+
+def test_sleep_delete_is_owner_controlled_and_persistent(client: TestClient) -> None:
+    sleep = client.post(
+        "/api/lifestyle/sleep",
+        json={
+            "patient_id": 1,
+            "actor_caregiver_id": 1,
+            "log_date": "2026-11-09",
+            "status": "Restful",
+            "bedtime": "23:00:00",
+            "wake_time": "07:00:00",
+        },
+    )
+    assert sleep.status_code == 200
+    record_id = sleep.json()["id"]
+
+    denied = client.delete(f"/api/lifestyle/sleep/{record_id}?actor_caregiver_id=2")
+    assert denied.status_code == 403
+
+    deleted = client.delete(f"/api/lifestyle/sleep/{record_id}?actor_caregiver_id=1")
+    assert deleted.status_code == 200
+    payload = client.get("/api/lifestyle?patient_id=1&actor_caregiver_id=1").json()
+    assert all(item["id"] != record_id for item in payload["sleep"])

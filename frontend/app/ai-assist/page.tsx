@@ -1,360 +1,52 @@
 "use client";
-
 import Link from "next/link";
-import { motion } from "framer-motion";
-import { useState } from "react";
-import {
-  ArrowRight,
-  Bot,
-  Check,
-  CheckCircle2,
-  ChevronRight,
-  ClipboardCheck,
-  FileCheck2,
-  FileText,
-  History,
-  Languages,
-  ListChecks,
-  LockKeyhole,
-  Pencil,
-  ShieldAlert,
-  ShieldCheck,
-  Sparkles,
-  UserRoundCheck,
-  X,
-} from "lucide-react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Sparkles, Check, Copy } from "lucide-react";
 import AppShell from "@/components/layout/AppShell";
-import { api } from "@/lib/api";
+import { Badge, Button, Field, Message, PageHeading, Panel } from "@/components/ui/ProductUI";
+import { api, type AIDraft, type AIOperation, type CoordinationFacts } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
+import { useMaatruCareDemo } from "@/context/MaatruCareDemoContext";
+import { caregiverLabel, displayTimestamp, optionLabel, participantOptions } from "@/lib/coordination";
 
-type DraftState = "idle" | "processing" | "ready" | "approved" | "rejected";
-
-const demoNote =
-  "Rahul will arrange transport for the upcoming clinic appointment. Lakshmi will prepare the appointment documents.";
-
-const capabilities = [
-  {
-    title: "Summarize fictional logistics",
-    description:
-      "Turn varied, non-clinical coordination notes into a concise draft.",
-    icon: FileCheck2,
-  },
-  {
-    title: "Suggest coordination tasks",
-    description:
-      "Surface logistical actions already present in the note for a person to check.",
-    icon: ListChecks,
-  },
-  {
-    title: "Keep people in control",
-    description:
-      "Review or reject the draft before deciding what to do next.",
-    icon: ClipboardCheck,
-  },
-  {
-    title: "Screen before processing",
-    description:
-      "Common identifier and clinical-content patterns are rejected server-side.",
-    icon: Languages,
-  },
-] as const;
-
-const safetyBoundaries = [
-  "Diagnose conditions",
-  "Predict or calculate medical risk",
-  "Assign risk categories",
-  "Interpret scans or laboratory results",
-  "Recommend treatment",
-  "Make clinical decisions",
-  "Provide autonomous medical advice",
+const operations: { value: AIOperation | "question"; title: string; description: string }[] = [
+ { value:"question",title:"Ask MaatruCare",description:"Find pending responsibilities and handoffs from records you can access. No records are sent to Gemini." },
+ { value:"summarize",title:"Summarize notes",description:"Organize facts, dates, people and unresolved logistics from your note." },
+ { value:"extract_tasks",title:"Extract tasks",description:"Turn written responsibilities into editable suggestions you can approve individually." },
+ { value:"appointment_prep",title:"Prepare appointment",description:"Separate instructions in your note from optional logistical checklist suggestions." },
+ { value:"handoff_draft",title:"Draft handoff",description:"Prepare a clear transfer of responsibility for your review." },
+ { value:"update_draft",title:"Draft care update",description:"Review and copy a concise coordination message. Messages are never sent automatically." },
+ { value:"nutrition_notes",title:"Organize meal notes",description:"Organize your meal log and personal goal notes without dietary prescriptions." },
 ];
-
+const example="Fictional coordination note: Clinic visit on Monday at 10 AM. Rahul will arrange transport by 9:15. Lakshmi will prepare previous reports. Pickup location still needs confirmation.";
 export default function AIAssistPage() {
-  const [draftState, setDraftState] = useState<DraftState>("idle");
-  const [draft, setDraft] = useState("");
-  const [editedDraft, setEditedDraft] = useState("");
-  const [suggestedTasks, setSuggestedTasks] = useState<string[]>([]);
-  const [coordinationNote, setCoordinationNote] = useState(demoNote);
-  const [aiError, setAiError] = useState("");
-  const [isEditing, setIsEditing] = useState(false);
-
-  async function prepareSummary() {
-    const note = coordinationNote.trim();
-
-    if (note.length < 10) {
-      setAiError("Enter at least 10 characters of coordination information.");
-      return;
-    }
-
-    setAiError("");
-    setDraft("");
-    setEditedDraft("");
-    setSuggestedTasks([]);
-    setDraftState("processing");
-    setIsEditing(false);
-
-    try {
-      const result = await Promise.race([
-        api.generateCoordinationSummary(note),
-        new Promise<never>((_, reject) => {
-          window.setTimeout(() => {
-            reject(new Error("Gemini is taking longer than expected. Please try again."));
-          }, 45000);
-        }),
-      ]);
-
-      if (!result.summary.trim()) {
-        throw new Error("The AI returned an empty summary.");
-      }
-
-      setDraft(result.summary);
-      setEditedDraft(result.summary);
-      setSuggestedTasks(result.tasks);
-      setDraftState("ready");
-    } catch (error) {
-      setAiError(
-        error instanceof Error
-          ? error.message
-          : "AI assistance is temporarily unavailable."
-      );
-      setDraftState("idle");
-    }
-  }
-
-  function approveDraft() {
-    setDraftState("approved");
-    setIsEditing(false);
-  }
-
-  function rejectDraft() {
-    setDraftState("rejected");
-    setIsEditing(false);
-  }
-
-  function saveEdit() {
-    setDraft(editedDraft.trim() || draft);
-    setDraftState("ready");
-    setIsEditing(false);
-  }
-
-  const hasDraft = draftState === "ready" || draftState === "approved" || draftState === "rejected";
-
-  return (
-    <AppShell>
-      <div>
-        <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9A9196]">
-              Assistive coordination
-            </p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-[-0.03em] text-[#211C1F]">
-              AI Assist
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-[#756D72]">
-              Organize fictional, non-clinical coordination notes without making clinical decisions.
-            </p>
-          </div>
-          <div className="flex w-fit items-center gap-2 rounded-full border border-[#CFE0D5] bg-[#F1F8F3] px-3.5 py-2 text-[10px] font-semibold text-[#3F6D56]">
-            <ShieldCheck size={14} />
-            Assistive AI · Human review required
-          </div>
-        </div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mt-8 flex gap-4 rounded-[20px] border border-[#E4D7DF] bg-[#F8F2F6] p-5"
-        >
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-[#EBDCE5] text-[#6D3A5B]">
-            <Sparkles size={19} />
-          </div>
-          <p className="self-center max-w-3xl text-xs leading-5 text-[#756D72]">
-            MaatruCare AI drafts summaries and suggested tasks from coordination notes. A person must review the output; this workflow does not share information.
-          </p>
-        </motion.div>
-
-        <section className="mt-8">
-              <SectionHeading eyebrow="AI capabilities" title="Assistive tools for coordination" />
-          <div className="mt-4 grid gap-4 md:grid-cols-2">
-            {capabilities.map((capability, index) => {
-              const Icon = capability.icon;
-              return (
-                <motion.div
-                  key={capability.title}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.06 }}
-                  className="rounded-[18px] border border-[#E9E1E4] bg-white p-5 shadow-[0_6px_24px_rgba(33,28,31,0.025)]"
-                >
-                  <div className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-[#F3EAF0] text-[#6D3A5B]"><Icon size={17} /></div>
-                  <h2 className="mt-5 text-sm font-semibold text-[#211C1F]">{capability.title}</h2>
-                  <p className="mt-2 text-[11px] leading-5 text-[#756D72]">{capability.description}</p>
-                </motion.div>
-              );
-            })}
-          </div>
-        </section>
-
-        <section className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-          <div className="rounded-[22px] border border-[#E9E1E4] bg-white p-6 shadow-[0_8px_30px_rgba(33,28,31,0.035)]">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9A9196]">Assistive workflow</p>
-                <h2 className="mt-1 text-[17px] font-semibold tracking-[-0.02em] text-[#211C1F]">Review information</h2>
-              </div>
-              <div className="flex h-9 w-9 items-center justify-center rounded-[11px] bg-[#FBF8F7] text-[#6D3A5B]"><FileText size={17} /></div>
-            </div>
-
-            <div className="mt-6 space-y-5">
-              <DemoField label="Scenario" value="Transport coordination" />
-              <DemoField label="Processing" value="Server-side screening and summary" />
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9A9196]">Fictional, non-clinical coordination note</p>
-                <textarea
-                  value={coordinationNote}
-                  onChange={(event) => setCoordinationNote(event.target.value)}
-                  rows={4}
-                  maxLength={3000}
-                  aria-label="Fictional coordination note"
-                  className="mt-2 w-full resize-y rounded-[14px] border border-[#E9E1E4] bg-[#FBF8F7] p-4 text-xs leading-5 text-[#211C1F] outline-none focus:border-[#6D3A5B]"
-                />
-              </div>
-            </div>
-
-            <div className="mt-6 flex gap-3 rounded-[14px] border border-[#E9E1E4] bg-[#FFFCFB] p-4">
-              <LockKeyhole size={16} className="mt-0.5 shrink-0 text-[#6D3A5B]" />
-              <p className="text-[10px] leading-4 text-[#756D72]">Use fictional, non-identifying, non-clinical logistics only. Do not enter real patient or caregiver details. The note is sent to the MaatruCare backend and, when enabled, its server-side AI provider after screening. Heuristic screening cannot guarantee detection of all sensitive information.</p>
-            </div>
-
-            {aiError && (
-              <p role="alert" className="mt-4 rounded-[12px] border border-[#E7D2D2] bg-[#FFF5F4] p-3 text-[11px] text-[#B85C62]">
-                {aiError}
-              </p>
-            )}
-
-            <button
-              type="button"
-              onClick={prepareSummary}
-              disabled={draftState === "processing"}
-              className="mt-6 flex w-full items-center justify-center gap-2 rounded-[13px] bg-[#6D3A5B] px-4 py-3 text-xs font-semibold text-white transition hover:bg-[#4D2941] disabled:cursor-wait disabled:opacity-70"
-            >
-              <Sparkles size={15} />
-              {draftState === "processing" ? "Generating AI summary..." : "Prepare coordination summary"}
-            </button>
-          </div>
-
-          <div className="rounded-[22px] border border-[#E9E1E4] bg-white p-6 shadow-[0_8px_30px_rgba(33,28,31,0.035)]">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9A9196]">Output</p>
-                <h2 className="mt-1 text-[17px] font-semibold tracking-[-0.02em] text-[#211C1F]">Coordination draft</h2>
-              </div>
-              <Bot size={19} className="text-[#6D3A5B]" />
-            </div>
-
-            {!hasDraft && (
-              <div className="mt-6 flex min-h-[250px] flex-col items-center justify-center rounded-[16px] border border-dashed border-[#DCCBD5] bg-[#FFFCFB] px-6 text-center">
-                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#F3EAF0] text-[#6D3A5B]"><Sparkles size={19} /></div>
-                <p className="mt-4 text-sm font-semibold text-[#211C1F]">Ready for a human-reviewed draft</p>
-                <p className="mt-2 max-w-sm text-[11px] leading-5 text-[#9A9196]">Prepare a draft from the coordination note. Nothing is saved or shared by this workflow.</p>
-              </div>
-            )}
-
-            {draftState === "processing" && (
-                <div className="mt-6 flex min-h-[250px] items-center justify-center rounded-[16px] bg-[#FBF8F7] text-xs font-medium text-[#6D3A5B]">
-                <span role="status" className="flex items-center gap-2"><span className="h-2 w-2 animate-pulse rounded-full bg-[#B86B87]" /> Preparing a coordination draft...</span>
-              </div>
-            )}
-
-            {hasDraft && (
-              <>
-                <div className="mt-6 rounded-[16px] border border-[#E4D7DF] bg-[#F8F2F6] p-4">
-                  <div className="flex items-center gap-2 text-[10px] font-semibold text-[#6D3A5B]"><Sparkles size={13} /> AI-generated draft · Requires human review</div>
-                  {isEditing ? (
-                    <textarea value={editedDraft} onChange={(event) => setEditedDraft(event.target.value)} rows={4} className="mt-4 w-full resize-none rounded-[11px] border border-[#D8C5D0] bg-white p-3 text-xs leading-5 text-[#211C1F] outline-none focus:border-[#6D3A5B]" aria-label="Edit coordination draft" />
-                  ) : (
-                    <p className="mt-4 text-sm leading-6 text-[#211C1F]">{draft}</p>
-                  )}
-                </div>
-
-                <div className="mt-5">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9A9196]">Suggested coordination tasks</p>
-                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                    {suggestedTasks.length > 0 ? (
-                      suggestedTasks.map((task, index) => (
-                        <TaskSuggestion key={`${index}-${task}`} title={task} />
-                      ))
-                    ) : (
-                      <p className="text-[11px] text-[#9A9196]">
-                        No explicit coordination tasks identified.
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                {draftState === "ready" && !isEditing && (
-                  <ReviewPanel onApprove={approveDraft} onEdit={() => { setEditedDraft(draft); setIsEditing(true); }} onReject={rejectDraft} />
-                )}
-                {draftState === "ready" && isEditing && (
-                  <button type="button" onClick={saveEdit} className="mt-5 flex w-full items-center justify-center gap-2 rounded-[12px] bg-[#6D3A5B] py-3 text-xs font-semibold text-white transition hover:bg-[#4D2941]"><Check size={15} />Save edited draft</button>
-                )}
-                {draftState === "approved" && <ApprovedState />}
-                {draftState === "rejected" && <RejectedState onPrepare={prepareSummary} />}
-              </>
-            )}
-          </div>
-        </section>
-
-        {draftState === "approved" && (
-          <section className="mt-6 rounded-[20px] border border-[#CFE0D5] bg-[#F1F8F3] p-5 sm:p-6">
-            <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex gap-3"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-[#E0EFE4] text-[#4F8068]"><ShieldCheck size={19} /></div><div><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#4F8068]">Review state</p><h2 className="mt-1 text-sm font-semibold text-[#211C1F]">A reviewer marked this draft ready</h2><p className="mt-2 max-w-2xl text-xs leading-5 text-[#5D7064]">This action changes only the current screen. It does not save an audit record or share information.</p></div></div>
-              <div className="flex flex-col gap-2 sm:flex-row lg:shrink-0"><ControlLink href="/consent" label="Review consent" /><ControlLink href="/care-circle" label="Care Circle" /></div>
-            </div>
-          </section>
-        )}
-
-        <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
-          <section className="rounded-[20px] border border-[#E6D8D8] bg-[#FFF9F8] p-6">
-            <div className="flex items-start gap-3"><div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px] bg-[#F8E8E6] text-[#B85C62]"><ShieldAlert size={17} /></div><div><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#B85C62]">Safety boundary</p><h2 className="mt-1 text-[17px] font-semibold text-[#211C1F]">What MaatruCare AI does NOT do</h2></div></div>
-            <ul className="mt-5 grid gap-3 sm:grid-cols-2">{safetyBoundaries.map((item) => <li key={item} className="flex items-start gap-2 text-[11px] leading-5 text-[#756D72]"><X size={14} className="mt-0.5 shrink-0 text-[#B85C62]" />{item}</li>)}</ul>
-          </section>
-
-          <section className="rounded-[20px] border border-[#E9E1E4] bg-white p-6 shadow-[0_8px_30px_rgba(33,28,31,0.025)]">
-            <div className="flex items-start gap-3"><div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px] bg-[#FBF8F7] text-[#6D3A5B]"><History size={17} /></div><div><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9A9196]">Audit trail</p><h2 className="mt-1 text-[17px] font-semibold text-[#211C1F]">Review activity</h2></div></div>
-            {draftState === "approved" ? <div className="mt-5 rounded-[14px] border border-[#CFE0D5] bg-[#F1F8F3] p-4"><div className="flex items-start gap-3"><div className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-[#E0EFE4] text-[#4F8068]"><CheckCircle2 size={16} /></div><div className="min-w-0 flex-1"><p className="text-xs font-semibold text-[#211C1F]">Review state changed in this browser session</p><p className="mt-2 text-[10px] leading-4 text-[#756D72]">No backend audit entry is created and no information is shared.</p></div></div></div> : <div className="mt-5 rounded-[14px] bg-[#FBF8F7] p-4 text-[11px] leading-5 text-[#9A9196]">Review decisions are local workflow state only; this workflow does not write an audit event.</div>}
-          </section>
-        </div>
-
-        <div className="mt-6 flex gap-3 rounded-[16px] bg-[#FBF8F7] p-4"><ShieldCheck size={16} className="mt-0.5 shrink-0 text-[#6D3A5B]" /><p className="text-[11px] leading-5 text-[#756D72]">This assistive workflow requires human review. A person remains responsible for reviewing and deciding what can be shared.</p></div>
-      </div>
-    </AppShell>
-  );
+ const {account}=useAuth();const {caregiverRecords,refreshData}=useMaatruCareDemo();
+ const [operation,setOperation]=useState<AIOperation|"question">("question");const [note,setNote]=useState("");const [language,setLanguage]=useState("English");const [consent,setConsent]=useState(false);
+ const [draft,setDraft]=useState<AIDraft|null>(null);const [history,setHistory]=useState<AIDraft[]>([]);const [busy,setBusy]=useState(false);const lock=useRef(false);const [message,setMessage]=useState({text:"",error:false});
+ const [edited,setEdited]=useState("");const [handoffTitle,setHandoffTitle]=useState("");const [recipient,setRecipient]=useState("");const [question,setQuestion]=useState("What tasks are still pending?");const [facts,setFacts]=useState<CoordinationFacts|null>(null);const [asked,setAsked]=useState("");
+ useEffect(()=>{let active=true;void api.getAIDrafts().then((items)=>{if(active)setHistory(items);}).catch(()=>{if(active)setMessage({text:"Saved AI drafts could not be loaded. You can try again below.",error:true});});return()=>{active=false;};},[]);
+ function acceptDraft(value:AIDraft){setDraft(value);setEdited(value.output.care_update??value.output.handoff_summary??value.output.summary);setHandoffTitle(value.output.handoff_title??"");setHistory((items)=>[value,...items.filter((item)=>item.id!==value.id)].slice(0,10));}
+ async function run(action:()=>Promise<unknown>,success:string){if(lock.current)return;lock.current=true;setBusy(true);setMessage({text:"",error:false});try{await action();setMessage({text:success,error:false});}catch(cause){setMessage({text:cause instanceof Error?cause.message:"The request could not be completed",error:true});}finally{lock.current=false;setBusy(false);}}
+ function generate(event:FormEvent){event.preventDefault();if(operation==="question")return;if(!consent){setMessage({text:"Confirm fictional or de-identified content and Gemini processing before continuing.",error:true});return;}void run(async()=>acceptDraft(await api.generateWorkspace({note:note.trim(),operation,language,external_processing_consent:consent})),"Draft ready for your review");}
+ async function ask(){if(!account?.patient_id||!account.caregiver_id)return;await run(async()=>{setFacts(await api.getCoordinationFacts({patientId:account.patient_id!,caregiverId:account.caregiver_id!}));setAsked(question);},"Saved coordination records retrieved");}
+ const chosen=operations.find((item)=>item.value===operation)!;
+ const questionCategory=/handoff|acknowledg/i.test(asked)?"handoffs":/appointment|visit|prepar/i.test(asked)?"appointments":"tasks";
+ const medicalQuestion=/diagnos|medic|symptom|treat|bleed|pain|emergency|diet prescription/i.test(asked);
+ return <AppShell><PageHeading title="AI Assist" description="Organize information. Review every suggestion. Stay in control." action={<Badge>Human review required</Badge>} />
+ <div className="mc-tabs" aria-label="AI tools">{operations.map((item)=><button key={item.value} aria-pressed={operation===item.value} onClick={()=>{setOperation(item.value);setDraft(null);}}>{item.title}</button>)}</div><Message error={message.error}>{message.text}</Message>
+ {operation==="question"?<Panel title="Ask MaatruCare" description={chosen.description}><form onSubmit={(event)=>{event.preventDefault();void ask();}}><Field label="Coordination question"><input required value={question} onChange={(event)=>setQuestion(event.target.value)} maxLength={500} /></Field><div className="mb-4 flex flex-wrap gap-2">{["What tasks are still pending?","Who is responsible for transport?","Which handoffs are awaiting acknowledgement?","What is the next appointment?"].map((text)=><Button key={text} variant="secondary" onClick={()=>setQuestion(text)}>{text}</Button>)}</div><Button type="submit" disabled={busy}>{busy?"Checking records...":"Check saved records"}</Button></form>{facts&&<div className="mt-6 border-t border-[var(--mc-border)] pt-5"><Badge>Retrieved facts</Badge><p className="mc-caption mt-2">{facts.source}</p>{medicalQuestion?<Message>This assistant cannot provide medical advice. Contact a qualified clinician; urgent concerns require local emergency services.</Message>:questionCategory==="tasks"?<><h3 className="mt-4 font-semibold">Open responsibilities</h3>{!facts.available_categories.includes("Coordination tasks")?<p className="mc-caption">Task information is not shared with this account.</p>:(/transport|car|cab|ride/i.test(asked)?facts.tasks.filter((item)=>/transport|car|cab|ride/i.test(item.title)):facts.tasks).map((item)=><div key={item.id} className="border-b border-[var(--mc-border)] py-3"><p className="font-semibold">{item.title}</p><p className="mc-caption">{item.owner}{item.simulated?" (Simulated)":""} - Due {item.due_date} - {item.status}</p></div>)}{facts.available_categories.includes("Coordination tasks")&&!facts.tasks.length&&<p className="mc-caption mt-3">No open responsibilities are recorded.</p>}<Link href="/tasks" className="mc-caption mt-3 inline-block underline">Open Tasks</Link></>:questionCategory==="handoffs"?<><h3 className="mt-4 font-semibold">Awaiting acknowledgement</h3>{!facts.available_categories.includes("Care handoffs")?<p className="mc-caption">Handoffs are not shared with this account.</p>:facts.handoffs.filter((item)=>item.status==="Awaiting acknowledgement").length?facts.handoffs.filter((item)=>item.status==="Awaiting acknowledgement").map((item)=><p key={item.id} className="mc-caption mt-3">{item.title} - {item.recipient}{item.simulated?" (Simulated)":""}</p>):<p className="mc-caption mt-3">No handoffs are awaiting acknowledgement.</p>}<Link href="/handoffs" className="mc-caption mt-3 inline-block underline">Open Handoffs</Link></>:<><h3 className="mt-4 font-semibold">Next recorded appointment</h3>{!facts.available_categories.includes("Appointments")?<p className="mc-caption">Appointment information is not shared with this account.</p>:facts.appointments[0]?<p className="mc-caption mt-3">{facts.appointments[0].title} - {facts.appointments[0].date} at {facts.appointments[0].time.slice(0,5)} - {facts.appointments[0].location}</p>:<p className="mc-caption mt-3">No upcoming appointment is recorded.</p>}{/prepar/i.test(asked)&&<p className="mc-caption mt-3">Open tasks are available under Tasks. They are not automatically linked to this appointment.</p>}<Link href="/appointments" className="mc-caption mt-3 inline-block underline">Open Appointments</Link></>}</div>}</Panel>:<div className="grid gap-5 xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+ <Panel title={chosen.title} description={chosen.description}><form onSubmit={generate}><Field label="Your coordination note" hint="Only this note is sent to Gemini. App records are not added automatically."><textarea required minLength={10} maxLength={3000} value={note} rows={9} onChange={(event)=>{setNote(event.target.value);setConsent(false);}} /></Field><Button variant="secondary" disabled={busy} onClick={()=>{setNote(example);setConsent(false);}}>Use fictional example</Button><Field label="AI narrative language"><select value={language} onChange={(event)=>setLanguage(event.target.value)}>{["English","Hindi","Telugu"].map((value)=><option key={value}>{value}</option>)}</select></Field><p className="mc-caption mb-3">Do not enter identifiable health records, contact details or clinical information. Review translated text before using it.</p><label className="mb-5 flex items-start gap-3 text-sm"><input type="checkbox" className="mt-1" checked={consent} onChange={(event)=>setConsent(event.target.checked)} /><span>This note is fictional or de-identified. I agree to send it to Gemini for processing.</span></label><Button type="submit" disabled={busy||!consent}><Sparkles size={16} />{busy?"Preparing draft...":"Prepare draft"}</Button></form></Panel>
+ <Panel title="Review your draft" description="Generated suggestions need your review; missing facts are left unresolved.">{draft?<><div className="mb-4 flex flex-wrap gap-2"><Badge tone={draft.status==="Approved"?"success":"neutral"}>{draft.status}</Badge><span className="mc-caption">{displayTimestamp(draft.created_at)}</span></div><p className="whitespace-pre-line text-sm leading-7">{draft.output.summary}</p>{draft.output.facts.length>0&&<details className="mt-4"><summary className="cursor-pointer text-sm font-semibold">Facts and source references</summary>{draft.output.facts.map((fact,index)=><blockquote key={index} className="mt-3 border-l-2 border-[var(--mc-brand)] pl-3 text-sm"><p>{fact.text}</p><p className="mc-caption mt-1">Source: {fact.source_quote}</p></blockquote>)}<p className="mc-caption mt-3">Dates: {draft.output.dates.join(", ")||"Not specified"}. Times: {draft.output.times.join(", ")||"Not specified"}. People: {draft.output.people.join(", ")||"Not specified"}.</p></details>}{draft.output.responsibilities.length>0&&<div className="mt-5"><h3 className="text-sm font-semibold">Responsibilities mentioned</h3><ul className="mc-caption mt-2 list-inside list-disc">{draft.output.responsibilities.map((item,index)=><li key={index}>{item.text}</li>)}</ul></div>}{draft.output.missing_information.length>0&&<div className="mt-5 rounded-xl bg-[var(--mc-surface-muted)] p-4"><h3 className="text-sm font-semibold">Needs clarification</h3><ul className="mc-caption mt-2 list-inside list-disc">{draft.output.missing_information.map((item,index)=><li key={index}>{item}</li>)}</ul></div>}
+ <div className="mt-5"><Field label="Editable draft"><textarea value={edited} maxLength={3000} onChange={(event)=>setEdited(event.target.value)} /></Field><div className="flex flex-wrap gap-2"><Button disabled={busy||!edited.trim()} onClick={()=>void run(async()=>acceptDraft(await api.reviewAIDraft(draft.id,{action:"approve",edited_text:edited})),"Draft approved")}><Check size={16} />Approve draft</Button><Button variant="secondary" disabled={busy} onClick={()=>void run(async()=>acceptDraft(await api.reviewAIDraft(draft.id,{action:"reject"})),"Draft rejected")}>Reject draft</Button>{draft.operation==="update_draft"&&draft.status==="Approved"&&<Button variant="secondary" disabled={busy||edited!==(draft.output.care_update??draft.output.summary)} onClick={()=>void run(()=>navigator.clipboard.writeText(edited),"Approved draft copied. No message was sent.")}><Copy size={15} />Copy approved update</Button>}</div></div>
+ {draft.operation==="handoff_draft"&&draft.status!=="Rejected"&&<form className="mt-6 border-t border-[var(--mc-border)] pt-5" onSubmit={(event)=>{event.preventDefault();if(!account?.patient_id||!account.caregiver_id)return;void run(async()=>{await api.createHandoff({patient_id:account.patient_id!,actor_caregiver_id:account.caregiver_id!,from_caregiver_id:account.caregiver_id!,to_caregiver_id:Number(recipient),title:handoffTitle.trim(),reason:edited.trim(),ai_draft_id:draft.id,human_approved:true});acceptDraft(await api.getAIDraft(draft.id));await refreshData();},"Approved handoff created. Open Handoffs to send it.");}}><Field label="Handoff title"><input required maxLength={255} value={handoffTitle} onChange={(event)=>setHandoffTitle(event.target.value)} /></Field><Field label="Receiving caregiver"><select required value={recipient} onChange={(event)=>setRecipient(event.target.value)}><option value="">Choose caregiver</option>{caregiverRecords.filter((member)=>member.id!==account?.caregiver_id).map((member)=><option key={member.id} value={member.id}>{caregiverLabel(member,caregiverRecords)}</option>)}</select></Field><Button type="submit" disabled={busy}>Approve & create handoff</Button><Link href="/handoffs" className="mc-caption ml-3 underline">Open Handoffs</Link></form>}
+ {draft.output.suggestions.length>0&&["summarize","extract_tasks","appointment_prep"].includes(draft.operation)&&<div className="mt-6 space-y-4 border-t border-[var(--mc-border)] pt-5"><h3 className="font-semibold">Proposed tasks</h3>{draft.output.suggestions.map((item,index)=><TaskSuggestion key={`${draft.id}:${index}`} {...{draft,item,index,account,caregiverRecords,busy}} onSave={(payload)=>run(async()=>{await api.createTask(payload);acceptDraft(await api.getAIDraft(draft.id));await refreshData();},"Task created. It is now available in Tasks.")} onReject={()=>void run(async()=>acceptDraft(await api.reviewAIDraft(draft.id,{action:"reject",suggestion_index:index})),"Suggestion rejected")} />)}<Link href="/tasks" className="mc-caption inline-block underline">Open Tasks</Link></div>}
+ </>:<p className="mc-caption py-12">Prepare a draft from a fictional or de-identified note. Core coordination features remain usable if AI is unavailable.</p>}</Panel></div>}
+ {history.length>0&&<Panel title="Your recent drafts" className="mt-5" description="Drafts and quoted excerpts are saved privately to this account."><div className="flex flex-wrap gap-2">{history.map((item)=><Button key={item.id} variant="secondary" disabled={busy} onClick={()=>{acceptDraft(item);setOperation(item.operation);}}>{operations.find((operation)=>operation.value===item.operation)?.title} - {displayTimestamp(item.created_at)} - {item.status}</Button>)}</div></Panel>}
+ </AppShell>;
 }
-
-function SectionHeading({ eyebrow, title }: { eyebrow: string; title: string }) {
-  return <div><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9A9196]">{eyebrow}</p><h2 className="mt-1 text-[17px] font-semibold tracking-[-0.02em] text-[#211C1F]">{title}</h2></div>;
-}
-
-function DemoField({ label, value }: { label: string; value: string }) {
-  return <div className="flex items-start justify-between gap-4 border-b border-[#F0E9EC] pb-4"><span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9A9196]">{label}</span><span className="text-right text-xs font-medium text-[#211C1F]">{value}</span></div>;
-}
-
-function TaskSuggestion({ title }: { title: string }) {
-  return <div className="flex items-center gap-2 rounded-[11px] border border-[#E9E1E4] bg-white px-3 py-2.5 text-[11px] font-medium text-[#211C1F]"><Check size={13} className="text-[#4F8068]" />{title}</div>;
-}
-
-function ReviewPanel({ onApprove, onEdit, onReject }: { onApprove: () => void; onEdit: () => void; onReject: () => void }) {
-  return <div className="mt-6 rounded-[16px] border border-[#E9E1E4] bg-[#FFFCFB] p-4"><div className="flex items-center gap-2"><UserRoundCheck size={16} className="text-[#6D3A5B]" /><p className="text-xs font-semibold text-[#211C1F]">Human review required</p></div><p className="mt-2 text-[10px] leading-4 text-[#756D72]">Check the draft and suggested tasks. Your choice is represented locally only; no information is saved or shared.</p><div className="mt-4 grid gap-2 sm:grid-cols-3"><button type="button" onClick={onApprove} className="flex items-center justify-center gap-1.5 rounded-[11px] bg-[#6D3A5B] px-3 py-2.5 text-[11px] font-semibold text-white transition hover:bg-[#4D2941]"><Check size={14} />Mark reviewed</button><button type="button" onClick={onEdit} className="flex items-center justify-center gap-1.5 rounded-[11px] border border-[#D8C5D0] bg-white px-3 py-2.5 text-[11px] font-semibold text-[#6D3A5B] transition hover:bg-[#F8F2F6]"><Pencil size={14} />Edit draft</button><button type="button" onClick={onReject} className="flex items-center justify-center gap-1.5 rounded-[11px] border border-[#E7D2D2] bg-white px-3 py-2.5 text-[11px] font-semibold text-[#B85C62] transition hover:bg-[#FFF5F4]"><X size={14} />Reject draft</button></div></div>;
-}
-
-function ApprovedState() {
-  return <div className="mt-6 flex items-center gap-3 rounded-[14px] border border-[#CFE0D5] bg-[#F1F8F3] p-4"><CheckCircle2 size={18} className="shrink-0 text-[#4F8068]" /><div><p className="text-xs font-semibold text-[#211C1F]">Marked reviewed</p><p className="mt-1 text-[10px] leading-4 text-[#5D7064]">This local state does not share information or persist an approval.</p></div></div>;
-}
-
-function RejectedState({ onPrepare }: { onPrepare: () => void }) {
-  return <div className="mt-6 rounded-[14px] border border-[#E7D2D2] bg-[#FFF5F4] p-4"><p className="text-xs font-semibold text-[#8D4B50]">Draft rejected - nothing was shared</p><button type="button" onClick={onPrepare} className="mt-3 flex items-center gap-1.5 text-[10px] font-semibold text-[#6D3A5B]">Prepare another draft <ArrowRight size={13} /></button></div>;
-}
-
-function ControlLink({ href, label }: { href: string; label: string }) {
-  return <Link href={href} className="flex items-center justify-center gap-1 rounded-[11px] border border-[#CFE0D5] bg-white px-3 py-2 text-[10px] font-semibold text-[#4F8068] transition hover:bg-[#EAF4ED]">{label}<ChevronRight size={13} /></Link>;
+function TaskSuggestion({draft,item,index,account,caregiverRecords,busy,onSave,onReject}:{draft:AIDraft;item:AIDraft["output"]["suggestions"][number];index:number;account:ReturnType<typeof useAuth>["account"];caregiverRecords:ReturnType<typeof useMaatruCareDemo>["caregiverRecords"];busy:boolean;onSave:(payload:Parameters<typeof api.createTask>[0])=>Promise<void>;onReject:()=>void}){
+ const options=participantOptions(account,caregiverRecords);const matches=options.filter((option)=>option.label.toLowerCase()===item.assignee_name?.toLowerCase());const [owner,setOwner]=useState(matches.length===1?matches[0].value:"");const [title,setTitle]=useState(item.title);const [due,setDue]=useState(item.due_date??"");const decision=draft.review[String(index)];
+ if(decision?.task_id)return <div className="rounded-xl border border-[var(--mc-border)] p-4"><Badge tone="success">Task created</Badge><p className="mt-2 text-sm">{item.title}</p></div>;
+ if(decision?.action==="reject"||draft.status==="Rejected")return <div className="rounded-xl border border-[var(--mc-border)] p-4"><Badge>Rejected</Badge><p className="mt-2 text-sm">{item.title}</p></div>;
+ return <form className="rounded-xl border border-[var(--mc-border)] p-4" onSubmit={(event)=>{event.preventDefault();if(!account?.patient_id||!account.caregiver_id)return;const [kind,rawId]=owner.split(":");void onSave({patient_id:account.patient_id,actor_caregiver_id:account.caregiver_id,title:title.trim(),due_date:due,category:"Coordination",...(kind==="patient"?{owner_patient_id:Number(rawId)}:{owner_id:Number(rawId)}),note:`Source note: ${item.source_quote}`,ai_draft_id:draft.id,ai_suggestion_index:index,human_approved:true});}}><Badge>{item.kind}</Badge><p className="mc-caption my-3">Source: {item.source_quote}</p><Field label="Task title"><input required maxLength={255} value={title} onChange={(event)=>setTitle(event.target.value)} /></Field><Field label="Assign to"><select required value={owner} onChange={(event)=>setOwner(event.target.value)}><option value="">Choose an assignee</option>{options.map((option)=><option key={option.value} value={option.value}>{optionLabel(option)}</option>)}</select></Field><Field label="Due date" hint={!item.due_date?"The note did not provide an exact calendar date. Choose one explicitly.":undefined}><input required type="date" value={due} onChange={(event)=>setDue(event.target.value)} /></Field><div className="flex gap-2"><Button type="submit" disabled={busy}>Approve & create task</Button><Button variant="secondary" disabled={busy} onClick={onReject}>Reject</Button></div></form>;
 }
