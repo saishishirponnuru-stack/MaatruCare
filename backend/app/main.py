@@ -25,6 +25,8 @@ from .routers import (
 )
 from .dependencies import authenticate_request
 from .services.auth_service import set_current_account
+from .services.safe_access_logging import install as install_safe_access_logging
+install_safe_access_logging()
 
 Base.metadata.create_all(bind=engine)
 

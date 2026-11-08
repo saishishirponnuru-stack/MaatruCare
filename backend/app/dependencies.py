@@ -34,4 +34,6 @@ def _authenticated_account(token: str) -> Account:
 				name=str(metadata.get("name") or claims.get("email") or "MaatruCare user"),
 				email=claims.get("email"),
 			)
+		account._verified_email = claims.get("email")
+		account._email_unverified = claims.get("email_verified") is False or (claims.get("user_metadata") or {}).get("email_verified") is False
 		return account

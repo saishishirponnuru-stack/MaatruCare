@@ -324,7 +324,8 @@ export const api = {
   bootstrapAccount: (payload: { name: string; role: "patient" | "caregiver"; invitation_token?: string; demo_workspace?: boolean }) =>
     request<ApiAuthAccount>("/api/auth/bootstrap", { method: "POST", body: JSON.stringify(payload) }),
   createCaregiverInvitation: (payload: { email: string; name?: string; relationship?: string; delivery?: "link" | "email" }) =>
-    request<{ token: string; email: string; email_status: ApiCaregiverInvitation["email_status"]; email_accepted_at: string | null }>("/api/auth/invitations", { method: "POST", body: JSON.stringify(payload) }),
+    request<{ id?: number; token: string; email: string; email_status: ApiCaregiverInvitation["email_status"]; email_accepted_at: string | null }>("/api/auth/invitations", { method: "POST", body: JSON.stringify(payload) }),
+  retryInvitationEmail: (id: number, token: string) => request<{ email_status: ApiCaregiverInvitation["email_status"]; email_accepted_at: string | null }>(`/api/auth/invitations/${id}/retry-email`, { method: "POST", body: JSON.stringify({ token }) }),
   invitationDelivery: () => request<{email_available: boolean; simulated_available: boolean; explanation: string}>("/api/auth/invitation-delivery"),
   withdrawCaregiverInvitation: (id: number) => request(`/api/auth/invitations/${id}/withdraw`, { method: "POST" }),
   acceptCaregiverInvitation: (token: string) => request<ApiAuthAccount>(`/api/auth/invitations/${encodeURIComponent(token)}/accept`, { method: "POST" }),

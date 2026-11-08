@@ -365,3 +365,14 @@ Captured after final report generation. No file has been staged or committed by 
 ?? frontend/tests/care-pulse.test.mjs
 ?? "how --stat d2e9619"
 ```
+
+
+## Latest protected-release checkpoint ? 8 November 2026
+
+The latest safety override supersedes earlier deployment authorizations. Production remains frontend `e000184` / backend `4a36db6`. No push/deploy/promotion/configuration/data mutation is authorized. Work is isolated on `fix/release-safe-2026-11-08`, based on local quality patch `60ae4b6` (parent e000184). See [complete safe stabilization report](SAFE-STABILIZATION-2026-11-08.md) for every file, test, integration boundary and controlled manual verification plan.
+
+Final current checks:165 backend passed/3 reset tests intentionally skipped;51 Node passed;39 optimized-build browser tests passed; TypeScript, ESLint and production build exit0. No schema migration in this candidate. It contains the inherited AI/mobile fixes plus current-JWT invitation email matching, bounded JWKS cache, owner-scoped invitation-email retry, token-safe access logging, explicit Care Circle refresh and unavailable-record feedback.
+
+The separate `feat/multi-circle-2026-11-08` prototype is parked uncommitted; it changes the core single-workspace authorization assumption. It is excluded from the safe candidate and must not be deployed or migrated. [Experimental checkpoint](../../maatrucare-multicircle-20261108/docs/MULTI-CIRCLE-EXPERIMENTAL-CHECKPOINT.md). Existing-account joining of another Circle remains unsupported and explicitly rejected.
+
+A single live Gemini service request with fictional input returned schema-valid output in4192ms without database access. Actual signed-in provider auth/recovery, production AI approval, real invitation email and production writes remain unverified. Resend credentials/verified sender/inbox are unavailable; secure link fallback remains working. Next: review the local commit and perform controlled manual acceptance only when authorized. Never reset or restore production data to test this patch.

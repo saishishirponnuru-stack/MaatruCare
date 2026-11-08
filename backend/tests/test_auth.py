@@ -43,7 +43,7 @@ def test_es256_jwks_token_is_verified(client: TestClient, monkeypatch) -> None:
 		algorithm="ES256",
 		headers={"kid": kid},
 	)
-	with patch.object(auth_service, "_jwks_cache", {"url": "https://qvbwpcnjshkrwvdcecmc.supabase.co/auth/v1/.well-known/jwks.json", "keys": [public_jwk]}):
+	with patch.object(auth_service, "_jwks_cache", {"url": "https://qvbwpcnjshkrwvdcecmc.supabase.co/auth/v1/.well-known/jwks.json", "keys": [public_jwk], "loaded_at": time.monotonic()}):
 		claims = auth_service.verify_supabase_jwt(token)
 	assert claims["sub"] == "es256-subject"
 
@@ -70,7 +70,7 @@ def test_es256_token_with_small_clock_skew_is_verified(client: TestClient, monke
 		algorithm="ES256",
 		headers={"kid": kid},
 	)
-	with patch.object(auth_service, "_jwks_cache", {"url": "https://qvbwpcnjshkrwvdcecmc.supabase.co/auth/v1/.well-known/jwks.json", "keys": [public_jwk]}):
+	with patch.object(auth_service, "_jwks_cache", {"url": "https://qvbwpcnjshkrwvdcecmc.supabase.co/auth/v1/.well-known/jwks.json", "keys": [public_jwk], "loaded_at": time.monotonic()}):
 		claims = auth_service.verify_supabase_jwt(token)
 	assert claims["sub"] == "clock-skew-subject"
 

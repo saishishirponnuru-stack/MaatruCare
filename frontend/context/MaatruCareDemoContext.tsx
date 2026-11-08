@@ -475,6 +475,8 @@ export function MaatruCareDemoProvider({
       if (generation !== refreshGeneration.current) return false;
       setTasks([]);
       setHandoffs([]);
+      setTaskError("Tasks are currently unavailable or not shared with this account.");
+      setHandoffError("Handoffs are currently unavailable or not shared with this account.");
       setTimeline([]);
       setPermissions({});
     setConsentHistory([]);

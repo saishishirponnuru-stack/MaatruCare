@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
 from ..database import get_db
-from ..models import Account, Caregiver, CaregiverInvitation, Patient, Permission
+from ..models import Account, AuditLog, Caregiver, CaregiverInvitation, Patient, Permission
 from ..services.access_service import is_workspace_owner, require_patient_controller
 from ..services.audit_service import record_audit
 from ..services.invitation_email_service import delivery_capability, send_invitation_email, InvitationEmailError
@@ -17,6 +17,7 @@ from ..services.auth_service import (
 	hash_invitation,
 	new_invitation_token,
 	require_current_account,
+	verified_account_email,
 )
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -63,6 +64,10 @@ class ProfileUpdate(BaseModel):
 	phone: str | None = Field(default=None, max_length=32, pattern=r"^[+0-9 ()-]*$")
 	current_phase: str | None = Field(default=None, pattern="^(Preconception|Pregnancy|Postnatal|Early motherhood)$")
 	name: str = Field(min_length=1, max_length=200)
+
+
+class InvitationEmailRetry(BaseModel):
+	token: str = Field(min_length=10, max_length=255)
 
 
 def _account_response(db: Session, account: Account) -> dict:
@@ -136,7 +141,7 @@ def bootstrap(payload: BootstrapRequest, request: Request, db: Session = Depends
 		))
 		if invitation is None:
 			raise HTTPException(status_code=400, detail="Invitation token is invalid or already used")
-		if not auth_account.email or auth_account.email.lower() != invitation.email.lower():
+		if not verified_account_email(auth_account) or verified_account_email(auth_account).lower() != invitation.email.lower():
 			raise HTTPException(status_code=403, detail="This invitation was issued for a different email address")
 		if invitation.created_at + timedelta(days=7) <= datetime.utcnow():
 			raise HTTPException(status_code=410, detail="This invitation has expired. Ask for a new invitation.")
@@ -269,7 +274,7 @@ def create_invitation(payload: InvitationRequest, request: Request, db: Session 
 		except Exception:
 			invitation.email_status = "failed"
 		db.commit()
-	return {"token": token, "email": email, "email_status": invitation.email_status, "email_accepted_at": invitation.email_accepted_at}
+	return {"id": invitation.id, "token": token, "email": email, "email_status": invitation.email_status, "email_accepted_at": invitation.email_accepted_at}
 
 
 @router.get("/invitation-delivery")
@@ -322,7 +327,7 @@ def accept_invitation(token: str, request: Request, db: Session = Depends(get_db
 	))
 	if invitation is None:
 		raise HTTPException(status_code=404, detail="Invitation not found or already accepted")
-	if not account.email or account.email.lower() != invitation.email.lower():
+	if not verified_account_email(account) or verified_account_email(account).lower() != invitation.email.lower():
 		raise HTTPException(status_code=403, detail="This invitation was issued for a different email address")
 	if invitation.created_at + timedelta(days=7) <= datetime.utcnow():
 		raise HTTPException(status_code=410, detail="This invitation has expired. Ask for a new invitation.")
@@ -359,3 +364,38 @@ def withdraw_invitation(invitation_id: int, request: Request, db: Session = Depe
 	record_audit(db, patient_id=account.patient_id, actor_name=actor.name, action="invitation_withdrawn", resource_type="CaregiverInvitation", resource_id=invitation.id)
 	db.commit()
 	return {"id": invitation.id, "status": "Withdrawn"}
+
+
+@router.post("/invitations/{invitation_id}/retry-email")
+def retry_invitation_email(invitation_id: int, payload: InvitationEmailRetry, request: Request, db: Session = Depends(get_db)):
+    import secrets
+    account = require_current_account(request)
+    if not account.patient_id or not account.caregiver_id:
+        raise HTTPException(403, "A Care Circle owner account is required")
+    require_patient_controller(db, account.caregiver_id, account.patient_id)
+    invitation = db.scalar(select(CaregiverInvitation).where(CaregiverInvitation.id == invitation_id, CaregiverInvitation.patient_id == account.patient_id).with_for_update())
+    if invitation is None or not secrets.compare_digest(hash_invitation(payload.token), invitation.token_hash):
+        raise HTTPException(404, "Invitation not found")
+    if invitation.accepted_at or invitation.withdrawn_at or invitation.created_at + timedelta(days=7) <= datetime.utcnow():
+        raise HTTPException(409, "Only a pending invitation can be emailed")
+    if invitation.email_status == "accepted":
+        return {"email_status": invitation.email_status, "email_accepted_at": invitation.email_accepted_at}
+    if not delivery_capability()["email_available"]:
+        raise HTTPException(409, "Invitation email is unavailable. Copy and securely share the existing link.")
+    db.scalar(select(Account.id).where(Account.id == account.id).with_for_update())
+    attempts = db.scalar(select(func.count(AuditLog.id)).where(AuditLog.actor_account_id == account.id, AuditLog.action == "invitation_email_retry", AuditLog.created_at > datetime.utcnow() - timedelta(hours=1)))
+    if attempts >= 10:
+        raise HTTPException(429, "Invitation email retry limit reached. Share the secure link or try again later.")
+    record_audit(db, patient_id=account.patient_id, actor_name=account.name, action="invitation_email_retry", resource_type="CaregiverInvitation", resource_id=invitation.id)
+    try:
+        # Same invitation ID => same provider idempotency key. Never rotates the
+        # token, changes its recipient or invalidates an already-shared link.
+        invitation.provider_message_id = send_invitation_email(invitation, payload.token)
+        invitation.email_status = "accepted"
+        invitation.email_accepted_at = datetime.utcnow()
+    except InvitationEmailError as error:
+        invitation.email_status = "unavailable" if str(error) == "unavailable" else "failed"
+    except Exception:
+        invitation.email_status = "failed"
+    db.commit()
+    return {"email_status": invitation.email_status, "email_accepted_at": invitation.email_accepted_at}

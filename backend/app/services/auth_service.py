@@ -1,6 +1,7 @@
 import os
 import secrets
 import threading
+from time import monotonic
 import urllib.request
 import json
 import hashlib
@@ -25,13 +26,14 @@ _jwks_cache: dict[str, Any] | None = None
 _jwks_lock = threading.Lock()
 
 
-def _load_jwks(jwks_url: str, force: bool = False) -> dict[str, Any]:
+def _load_jwks(jwks_url: str, force: bool = False, expected=None) -> dict[str, Any]:
 	global _jwks_cache
 	with _jwks_lock:
-		if force or _jwks_cache is None or _jwks_cache.get("url") != jwks_url:
+		expired = _jwks_cache is None or monotonic() - _jwks_cache.get("loaded_at", float("-inf")) >= 300
+		if expired or _jwks_cache.get("url") != jwks_url or (force and (expected is None or _jwks_cache is expected)):
 			try:
 				with urllib.request.urlopen(jwks_url, timeout=5) as response:
-					_jwks_cache = {"url": jwks_url, "keys": json.load(response)["keys"]}
+					_jwks_cache = {"url": jwks_url, "keys": json.load(response)["keys"], "loaded_at": monotonic()}
 			except Exception as exc:
 				raise HTTPException(status_code=503, detail="JWT key discovery is unavailable") from exc
 		return _jwks_cache
@@ -48,7 +50,7 @@ def _jwks_key(token: str) -> tuple[Any, list[str]]:
 	jwks = _load_jwks(jwks_url)
 	key = next((item for item in jwks["keys"] if item.get("kid") == kid), None)
 	if key is None:
-		jwks = _load_jwks(jwks_url, force=True)
+		jwks = _load_jwks(jwks_url, force=True, expected=jwks)
 		key = next((item for item in jwks["keys"] if item.get("kid") == kid), None)
 	if key is None:
 		raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid bearer token")
@@ -100,6 +102,12 @@ def set_current_account(account: Account | None) -> None:
 
 def get_current_account() -> Account | None:
 	return _current_account.get()
+
+
+def verified_account_email(account) -> str | None:
+	if getattr(account, "_email_unverified", False):
+		return None
+	return getattr(account, "_verified_email", account.email)
 
 
 def require_current_account(request: Request) -> Account:

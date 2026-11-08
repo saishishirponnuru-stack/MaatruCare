@@ -19,6 +19,9 @@ os.environ["SUPABASE_JWT_SECRET"] = ""
 os.environ["SUPABASE_JWKS_URL"] = ""
 os.environ["SUPABASE_ISSUER"] = ""
 os.environ["SUPABASE_AUDIENCE"] = "authenticated"
+os.environ["GEMINI_API_KEY"] = ""
+os.environ["RESEND_API_KEY"] = ""
+os.environ["MAATRUCARE_INVITATION_EMAIL_ENABLED"] = "false"
 
 
 def _assert_isolated_database() -> None:
