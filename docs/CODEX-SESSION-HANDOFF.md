@@ -376,3 +376,14 @@ Final current checks:165 backend passed/3 reset tests intentionally skipped;51 N
 The separate `feat/multi-circle-2026-11-08` prototype is parked uncommitted; it changes the core single-workspace authorization assumption. It is excluded from the safe candidate and must not be deployed or migrated. [Experimental checkpoint](../../maatrucare-multicircle-20261108/docs/MULTI-CIRCLE-EXPERIMENTAL-CHECKPOINT.md). Existing-account joining of another Circle remains unsupported and explicitly rejected.
 
 A single live Gemini service request with fictional input returned schema-valid output in4192ms without database access. Actual signed-in provider auth/recovery, production AI approval, real invitation email and production writes remain unverified. Resend credentials/verified sender/inbox are unavailable; secure link fallback remains working. Next: review the local commit and perform controlled manual acceptance only when authorized. Never reset or restore production data to test this patch.
+
+
+## Latest local prototype-hardening checkpoint ? 8 November 2026
+
+Production remains protected: frontend e000184, backend4a36db6. No push, deployment, promotion, production settings/data change or experimental membership merge is authorized or performed. The new worktree is `maatrucare-polish-20261108`, branch `fix/local-polish-2026-11-08`, based on70585b7. See [complete current report](LOCAL-PROTOTYPE-HARDENING.md) for changes, evidence, screenshots, all files and limitations.
+
+Local implementation: unchanged-identity refresh stability; genuine Next route loading feedback; shared emblem/text branding; explicitly opted-in local-only sample Care Circle with all sharing off; signed short-lived lifestyle deletion previews, transactional exact-record deletion, stale/concurrent protection and audit. No database model/migration changes. Production sample seeding and history reset remain blocked. Multi-Circle is untouched and unsupported in this candidate.
+
+Final automated gates:183 backend passed/0 skipped with explicit disposable-reset test authorization;54 Node passed;43 standard browser workflows plus3 opt-in demo/reset browser cases passed; TypeScript/lint/optimized build pass; six final repeated benchmark cases pass. Real external auth/email/Gemini and production RSC latency are unverified. Supabase additional localhost callback URLs need manual verification; do not change Site URL or credentials.
+
+Current optimized manual candidate: http://localhost:3002/sign-in and http://127.0.0.1:8002/api/health, using a fresh verified SQLite file outside Git. Earlier localhost servers remain intact. Startup/restart commands, the first-local-workspace reset allowlist, and integration boundaries are in the report. No real-user data or production backup is a test fixture. Only a reviewed local commit is permitted; deployment still requires fresh explicit approval.

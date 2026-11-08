@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
+import BrandLogo from "@/components/ui/BrandLogo";
 import { usePathname } from "next/navigation";
 import { Menu, Moon, Sun, UserRound, X } from "lucide-react";
 import { motion } from "framer-motion";
@@ -59,19 +59,7 @@ export default function Topbar({
         </motion.button>
 
         <Link href="/dashboard" prefetch={false} aria-label="MaatruCare home" className="flex min-w-0 items-center gap-2.5 lg:hidden">
-          <Image
-            src="/maatru-care-mark.webp"
-            alt=""
-            aria-hidden="true"
-            width={512}
-            height={512}
-            priority
-            className="mc-brand-mark h-9 w-9 shrink-0 object-contain"
-          />
-          <span className="min-w-0">
-            <span className="block truncate text-[12px] font-semibold tracking-[0.01em] text-[var(--mc-text)]">MaatruCare</span>
-            <span className="block truncate text-[11px] font-medium text-[var(--mc-muted)]">{title}</span>
-          </span>
+          <BrandLogo compact subtitle={title} />
         </Link>
 
         <div className="hidden min-w-0 lg:block">

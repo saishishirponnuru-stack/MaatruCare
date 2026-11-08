@@ -13,6 +13,7 @@ from ..services.access_service import is_workspace_owner, require_patient_contro
 from ..services.audit_service import record_audit
 from ..services.invitation_email_service import delivery_capability, send_invitation_email, InvitationEmailError
 from ..services.demo_caregiver_service import demo_caregivers_available, demo_mode_enabled
+from ..services.simulated_caregiver_service import seed_onboarding_caregivers, onboarding_seed_enabled
 from ..services.auth_service import (
 	hash_invitation,
 	new_invitation_token,
@@ -21,6 +22,12 @@ from ..services.auth_service import (
 )
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+
+
+@router.get("/onboarding-options")
+def onboarding_options(request: Request):
+	require_current_account(request)
+	return {"seed_demo_caregivers": onboarding_seed_enabled()}
 
 
 class BootstrapRequest(BaseModel):
@@ -188,6 +195,9 @@ def bootstrap(payload: BootstrapRequest, request: Request, db: Session = Depends
 	elif payload.demo_workspace:
 		record_audit(db, patient_id=patient.id, actor_name=account.name, action="demo_workspace_created", resource_type="Patient", resource_id=patient.id)
 	try:
+		db.flush()
+		if payload.role == "patient" and payload.demo_workspace:
+			seed_onboarding_caregivers(db, account)
 		db.commit()
 	except IntegrityError:
 		# A simultaneous bootstrap for the same subject must not leave orphan profiles.
@@ -196,6 +206,9 @@ def bootstrap(payload: BootstrapRequest, request: Request, db: Session = Depends
 		if existing is None:
 			raise
 		return _account_response(db, existing)
+	except Exception:
+		db.rollback()
+		raise
 	db.refresh(account)
 	return _account_response(db, account)
 

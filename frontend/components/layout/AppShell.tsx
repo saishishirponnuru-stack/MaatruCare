@@ -7,9 +7,10 @@ import { useMaatruCareDemo } from "@/context/MaatruCareDemoContext";
 
 interface AppShellProps {
   children: ReactNode;
+  busy?: boolean;
 }
 
-export default function AppShell({ children }: AppShellProps) {
+export default function AppShell({ children, busy = false }: AppShellProps) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const mobileDrawerRef = useRef<HTMLElement | null>(null);
   const menuButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -81,7 +82,7 @@ export default function AppShell({ children }: AppShellProps) {
         menuButtonRef={menuButtonRef}
       />
 
-      <main aria-busy={loading} className="ml-0 pt-[72px] lg:ml-[250px] lg:pt-[82px]">
+      <main aria-busy={loading || busy} className="ml-0 pt-[72px] lg:ml-[250px] lg:pt-[82px]">
         <div className="mx-auto min-h-[calc(100vh-72px)] w-full max-w-[1440px] px-4 py-5 sm:px-6 sm:py-7 lg:min-h-[calc(100vh-82px)] lg:px-8 lg:py-8 xl:px-10">
           {children}
           {loading && <div role="status" aria-live="polite" className="fixed bottom-4 right-4 z-30 rounded-[12px] border border-[var(--mc-border)] bg-[var(--mc-surface)] px-3 py-2 text-[11px] font-medium text-[var(--mc-muted)] shadow-sm">Loading coordination data...</div>}

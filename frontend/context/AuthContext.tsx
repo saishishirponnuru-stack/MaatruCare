@@ -80,7 +80,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (subjectRef.current !== subject || current.subject !== subject) return null;
         setAuthError("");
         loadedSubjectRef.current = subject;
-        setAccount(current);setAccountReady(true);
+        // Keep the identity snapshot stable when an explicit refresh returns
+        // unchanged data. Replacing it restarts every workspace effect.
+        setAccount(previous => JSON.stringify(previous) === JSON.stringify(current) ? previous : current);setAccountReady(true);
         return current;
       } catch (error) {
         if (error instanceof ApiError && error.status === 404) {

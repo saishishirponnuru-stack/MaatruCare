@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Accessibility,
@@ -59,11 +59,12 @@ export default function SettingsPage() {
   const { account, email, signOut, sendPasswordReset } = useAuth();
   const [accountMessage, setAccountMessage] = useState("");
   const [accountBusy, setAccountBusy] = useState(false);
+  const resetLock = useRef(false);
   const [resetMessage, setResetMessage] = useState("");
   const [resetSucceeded, setResetSucceeded] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [resetPreferences, setResetPreferences] = useState(false);
-  const [resetPreview, setResetPreview] = useState<{ enabled: boolean; counts: Record<string, number>; explanation: string } | null>(null);
+  const [resetPreview, setResetPreview] = useState<{ enabled: boolean; counts: Record<string, number>; preview_token?: string | null; explanation: string } | null>(null);
   useEffect(() => {
     let active = true;
     if (!account?.patient_id || !account.caregiver_id) return;
@@ -92,23 +93,31 @@ export default function SettingsPage() {
   }
 
   async function resetLifestyle() {
-    if (resetting || !resetPreview?.enabled) return;
+    if (resetLock.current || resetting || !resetPreview?.enabled || !resetPreview.preview_token) return;
     const deletionList = Object.entries(resetPreview.counts).map(([label, count]) => `${label.replaceAll("_", " ")}: ${count}`).join(", ");
     if (!window.confirm(`Delete these records from your demonstration workspace: ${deletionList}? Plans, routines, care records and authentication accounts will be preserved.`)) return;
     setResetMessage("");
     setResetSucceeded(false);
+    resetLock.current = true;
     setResetting(true);
     try {
       if (!account?.patient_id || !account.caregiver_id) throw new Error("Finish setting up your care workspace to continue.");
-      const result = await api.resetLifestyle({ patient_id: account.patient_id, actor_caregiver_id: account.caregiver_id, reset_preferences: resetPreferences, confirmed: true, expected_counts: resetPreview.counts });
+      const result = await api.resetLifestyle({ patient_id: account.patient_id, actor_caregiver_id: account.caregiver_id, reset_preferences: resetPreferences, confirmed: true, expected_counts: resetPreview.counts, preview_token: resetPreview.preview_token });
       setResetSucceeded(true);
-      setResetMessage(`Reset confirmed by the backend. ${Object.values(result.deleted).reduce((sum, count) => sum + count, 0)} Lifestyle record(s) removed.`);
+      setResetPreview(null);
+      setResetMessage(`History cleared. ${Object.values(result.deleted).reduce((sum, count) => sum + count, 0)} lifestyle entries removed.`);
+      try { setResetPreview(await api.previewLifestyleReset({patientId:account.patient_id,caregiverId:account.caregiver_id},resetPreferences)); }
+      catch { setResetMessage("History was cleared, but the new preview could not be loaded. Reload Settings before making another change."); }
     } catch (error) {
       const detail = error instanceof Error ? error.message : "Lifestyle reset could not be completed.";
+      if (account?.patient_id && account.caregiver_id) {
+        try { setResetPreview(await api.previewLifestyleReset({patientId:account.patient_id,caregiverId:account.caregiver_id},resetPreferences)); } catch { setResetPreview(null); }
+      }
       setResetMessage(detail === "Demo reset is disabled"
         ? "Reset is currently unavailable. A server administrator must enable it before use."
         : detail);
     } finally {
+      resetLock.current = false;
       setResetting(false);
     }
   }
@@ -197,7 +206,7 @@ export default function SettingsPage() {
               {resetPreview?.enabled && <>
                 <label className="mt-4 flex items-start gap-3 rounded-[11px] bg-[#FBF8F7] p-3 text-xs leading-5 text-[#756D72]"><input type="checkbox" checked={resetPreferences} onChange={(event) => { setResetPreview(null); setResetPreferences(event.target.checked); }} className="mt-1 h-4 w-4 accent-[#6D3A5B]" />Also reset personal Lifestyle goals and preferences.</label>
                 <ul className="mt-3 space-y-1 text-xs text-[#756D72]">{Object.entries(resetPreview.counts).map(([label, count]) => <li key={label}>{label.replaceAll("_", " ")}: {count} record(s) to delete</li>)}</ul>
-                <button type="button" onClick={() => void resetLifestyle()} disabled={resetting} className="mt-4 flex min-h-11 items-center gap-2 rounded-[11px] border border-[#D8B7AD] px-4 py-3 text-xs font-semibold text-[#9A5145] disabled:opacity-60"><RotateCcw size={15} />{resetting ? "Resetting..." : "Confirm demo lifestyle reset"}</button>
+                <button type="button" onClick={() => void resetLifestyle()} disabled={resetting || !resetPreview.preview_token || !Object.values(resetPreview.counts).some(Boolean)} className="mt-4 flex min-h-11 items-center gap-2 rounded-[11px] border border-[#D8B7AD] px-4 py-3 text-xs font-semibold text-[#9A5145] disabled:opacity-60"><RotateCcw size={15} />{resetting ? "Resetting..." : "Confirm demo lifestyle reset"}</button>
               </>}
               {resetMessage && <div role={resetSucceeded ? "status" : "alert"} className="mt-3 rounded-[11px] bg-[#FBF8F7] p-3 text-[11px] leading-5 text-[#756D72]"><p>{resetMessage}</p>{resetSucceeded && <Link href="/lifestyle" className="mt-2 inline-flex min-h-9 items-center font-semibold text-[#6D3A5B] underline underline-offset-2">Review refreshed Lifestyle records</Link>}</div>}
             </SettingsSection>

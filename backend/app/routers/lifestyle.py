@@ -9,6 +9,8 @@ from ..database import get_db
 from ..lifestyle_models import ActivityLog, ActivityRoutine, DietAdherence, DietRecommendation, LifestylePreference, NutritionLog, SleepLog, WaterLog, WeightEntry
 from ..lifestyle_schemas import ActivityLogCreate, ActivityRoutineCreate, DietAdherenceCreate, DietRecommendationCreate, LifestylePreferenceUpdate, LifestyleResetRequest, LifestyleResetResponse, LifestyleResponse, NutritionCreate, SleepCreate, WaterCreate, WeightCreate
 from ..models import Patient
+from ..services import lifestyle_reset_service
+from ..services.audit_service import record_audit
 from ..services.access_service import is_workspace_owner, require_patient_caregiver, require_permission
 
 router = APIRouter(prefix="/api/lifestyle", tags=["lifestyle"])
@@ -83,51 +85,39 @@ def reset_enabled(patient_id: int) -> bool:
     )
 
 
-def reset_counts(db: Session, patient_id: int, reset_preferences: bool) -> dict[str, int]:
-    counts = {
-        "water": db.query(WaterLog).filter_by(patient_id=patient_id).count(),
-        "sleep": db.query(SleepLog).filter_by(patient_id=patient_id).count(),
-        "weight": db.query(WeightEntry).filter_by(patient_id=patient_id).count(),
-        "nutrition": db.query(NutritionLog).filter_by(patient_id=patient_id).count(),
-        "diet_adherence": db.query(DietAdherence).join(DietRecommendation, DietAdherence.recommendation_id == DietRecommendation.id).filter(DietRecommendation.patient_id == patient_id).count(),
-        "activity_logs": db.query(ActivityLog).join(ActivityRoutine, ActivityLog.routine_id == ActivityRoutine.id).filter(ActivityRoutine.patient_id == patient_id).count(),
-    }
-    if reset_preferences:
-        counts["preferences"] = db.query(LifestylePreference).filter_by(patient_id=patient_id).count()
-    return counts
-
-
 @router.get("/reset-preview")
 def preview_reset(patient_id: int, actor_caregiver_id: int, reset_preferences: bool = False, db: Session = Depends(get_db)):
-    access(db, actor_caregiver_id, patient_id, True)
+    actor = access(db, actor_caregiver_id, patient_id, True)
     enabled = reset_enabled(patient_id)
-    return {"enabled": enabled, "counts": reset_counts(db, patient_id, reset_preferences) if enabled else {}, "explanation": "Reset is restricted to explicitly configured local demonstration workspaces. Your records are preserved." if not enabled else "Only the listed lifestyle records in your demo workspace will be deleted. Plans, routines, care records, and authentication accounts are preserved."}
+    counts, token = lifestyle_reset_service.preview(db, patient_id, actor, reset_preferences) if enabled else ({}, None)
+    return {"enabled": enabled, "counts": counts, "preview_token": token,
+            "explanation": "Reset is restricted to explicitly configured local demonstration workspaces. Your records are preserved." if not enabled else "Review the listed lifestyle entries. Goals and care records are preserved unless you separately select preferences."}
 
 
 @router.post("/reset", response_model=LifestyleResetResponse)
 def reset_lifestyle(payload: LifestyleResetRequest, db: Session = Depends(get_db)):
     if not reset_enabled(payload.patient_id):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Demo reset is disabled")
-    access(db, payload.actor_caregiver_id, payload.patient_id, True)
-    if not payload.confirmed or payload.expected_counts != reset_counts(db, payload.patient_id, payload.reset_preferences):
-        raise HTTPException(409, "Review the current deletion preview and confirm before resetting")
-    routines = db.scalars(select(ActivityRoutine).where(ActivityRoutine.patient_id == payload.patient_id)).all()
-    recommendations = db.scalars(select(DietRecommendation).where(DietRecommendation.patient_id == payload.patient_id)).all()
-    routine_ids = [routine.id for routine in routines]
-    recommendation_ids = [recommendation.id for recommendation in recommendations]
+        raise HTTPException(403, "Demo reset is disabled")
     try:
-        counts = {
-            "nutrition": db.query(NutritionLog).filter(NutritionLog.patient_id == payload.patient_id).delete(synchronize_session=False),
-            "water": db.query(WaterLog).filter(WaterLog.patient_id == payload.patient_id).delete(synchronize_session=False),
-            "sleep": db.query(SleepLog).filter(SleepLog.patient_id == payload.patient_id).delete(synchronize_session=False),
-            "weight": db.query(WeightEntry).filter(WeightEntry.patient_id == payload.patient_id).delete(synchronize_session=False),
-            "diet_adherence": db.query(DietAdherence).filter(DietAdherence.recommendation_id.in_(recommendation_ids)).delete(synchronize_session=False) if recommendation_ids else 0,
-            "activity_logs": db.query(ActivityLog).filter(ActivityLog.routine_id.in_(routine_ids)).delete(synchronize_session=False) if routine_ids else 0,
-        }
-        if payload.reset_preferences:
-            counts["preferences"] = db.query(LifestylePreference).filter(LifestylePreference.patient_id == payload.patient_id).delete(synchronize_session=False)
+        if db.bind.dialect.name == "sqlite":
+            # This route owns the transaction. Acquire the write reservation
+            # before inspecting the preview so edits cannot race deletion.
+            db.connection().exec_driver_sql("BEGIN IMMEDIATE")
+        actor = access(db, payload.actor_caregiver_id, payload.patient_id, True)
+        db.scalar(select(Patient.id).where(Patient.id == payload.patient_id).with_for_update())
+        records, digest = lifestyle_reset_service.snapshot(db, payload.patient_id, payload.reset_preferences, lock=True)
+        counts = {name: len(ids) for name, (_, ids) in records.items()}
+        if not payload.confirmed or not payload.preview_token or payload.expected_counts != counts:
+            raise HTTPException(409, "Review the current deletion preview and confirm before resetting")
+        lifestyle_reset_service.validate(payload.preview_token, patient_id=payload.patient_id, actor=actor, reset_preferences=payload.reset_preferences, digest=digest)
+        if not any(counts.values()):
+            raise HTTPException(409, "There are no lifestyle entries in this preview to clear")
+        deleted = lifestyle_reset_service.delete_snapshot(db, records)
+        if deleted != counts:
+            raise HTTPException(409, "Records changed. Review a fresh deletion preview.")
+        record_audit(db, patient_id=payload.patient_id, actor_name=actor.name, action="lifestyle_history_reset", resource_type="Patient", resource_id=payload.patient_id)
         db.commit()
-        return {"deleted": counts, "preferences_reset": payload.reset_preferences}
+        return {"deleted": deleted, "preferences_reset": payload.reset_preferences}
     except Exception:
         db.rollback()
         raise

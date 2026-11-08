@@ -82,37 +82,15 @@ def create_demo_caregiver(payload: DemoCaregiverCreate, db: Session = Depends(ge
 	)
 	if duplicate is not None:
 		raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This simulated caregiver already exists")
-	caregiver = Caregiver(
-		patient_id=payload.patient_id,
-		name=name,
-		relationship=relationship,
-		role=payload.role,
-		is_demo=True,
-		email=email,
-		access_status="Active",
-	)
+	from ..services.simulated_caregiver_service import add_simulated_caregiver
 	try:
-		db.add(caregiver)
-		db.flush()
-		for permission_name in ("Appointments", "Coordination tasks", "Care handoffs", "Approved care updates", "Lifestyle records"):
-			enabled = payload.coordination_access and permission_name in {"Coordination tasks", "Care handoffs"}
-			db.add(Permission(caregiver_id=caregiver.id, permission_name=permission_name, enabled=enabled))
-			if enabled:
-				db.add(ConsentRecord(patient_id=payload.patient_id, caregiver_id=caregiver.id, permission_name=permission_name, action="granted"))
-		record_audit(
-			db,
-			patient_id=payload.patient_id,
-			actor_name=actor.name,
-			action="demo_caregiver_created",
-			resource_type="Caregiver",
-			resource_id=caregiver.id,
-		)
+		caregiver = add_simulated_caregiver(db, patient_id=payload.patient_id, name=name, relationship=relationship, role=payload.role, email=email, coordination_access=payload.coordination_access, actor_name=actor.name)
 		db.commit()
 		db.refresh(caregiver)
+		return caregiver
 	except Exception:
 		db.rollback()
 		raise
-	return caregiver
 
 
 @router.delete("/{caregiver_id}", response_model=CaregiverResponse)

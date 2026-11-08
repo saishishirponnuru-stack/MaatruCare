@@ -15,9 +15,12 @@ if os.getenv("RENDER", "").lower() == "true" or os.getenv("MAATRUCARE_ENV", "").
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 scratch = tempfile.TemporaryDirectory(prefix="maatrucare-browser-tests-")
 secret = secrets.token_urlsafe(48)
+polish_tests = os.getenv("MAATRUCARE_BROWSER_POLISH_TESTS") == "true"
 os.environ.update(DATABASE_URL=f"sqlite:///{Path(scratch.name) / 'test.sqlite3'}", RENDER="false",
-                  MAATRUCARE_ENV="test", MAATRUCARE_TEST_AUTH_COMPAT="false", MAATRUCARE_SEED_DEMO_DATA="false",
-                  MAATRUCARE_DEMO_RESET_ENABLED="false", MAATRUCARE_DEMO_CAREGIVERS_ENABLED="true",
+                  MAATRUCARE_ENV="local" if polish_tests else "test", MAATRUCARE_TEST_AUTH_COMPAT="false", MAATRUCARE_SEED_DEMO_DATA="false",
+                  MAATRUCARE_DEMO_RESET_ENABLED="true" if polish_tests else "false", MAATRUCARE_DEMO_CAREGIVERS_ENABLED="true",
+                  MAATRUCARE_DEMO_ONBOARDING_SEED_ENABLED="true" if polish_tests else "false",
+                  MAATRUCARE_DEMO_RESET_PATIENT_IDS=",".join(map(str,range(1,1001))) if polish_tests else "",
                   MAATRUCARE_DEMO_CAREGIVER_PATIENT_IDS="1",
                   MAATRUCARE_INVITATION_EMAIL_ENABLED="false", RESEND_API_KEY="", MAATRUCARE_INVITATION_FROM="",
                   MAATRUCARE_PUBLIC_APP_URL="http://localhost:3100",

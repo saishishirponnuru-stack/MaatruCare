@@ -312,6 +312,7 @@ async function executeRequest<T>(path: string, init: RequestInit | undefined, se
 }
 
 export const api = {
+  onboardingOptions: () => request<{ seed_demo_caregivers: boolean }>("/api/auth/onboarding-options"),
   generateWorkspace: (payload: { note: string; operation: AIOperation; language: string; external_processing_consent: boolean }) => request<AIDraft>("/api/ai/workspace", { method: "POST", body: JSON.stringify(payload) }),
   getAIDrafts: () => request<AIDraft[]>("/api/ai/drafts"),
   getAIDraft: (id: number) => request<AIDraft>(`/api/ai/drafts/${id}`),
@@ -372,7 +373,7 @@ export const api = {
   deleteActivityLog: (id: number, identity: ApiIdentity) => request(`/api/lifestyle/activities/logs/${id}?actor_caregiver_id=${identity.caregiverId}`, { method: "DELETE" }),
   archiveRoutine: (id: number, identity?: ApiIdentity) => request(`/api/lifestyle/activities/routines/${id}${identity ? `?actor_caregiver_id=${identity.caregiverId}` : ""}`, { method: "DELETE" }),
   updateLifestylePreferences: (payload: Record<string, unknown>) => request("/api/lifestyle/preferences", { method: "PUT", body: JSON.stringify(payload) }),
-  previewLifestyleReset: (identity: ApiIdentity, resetPreferences: boolean) => request<{ enabled: boolean; counts: Record<string, number>; explanation: string }>(`/api/lifestyle/reset-preview?${identityQuery(identity)}&reset_preferences=${resetPreferences}`),
+  previewLifestyleReset: (identity: ApiIdentity, resetPreferences: boolean) => request<{ enabled: boolean; counts: Record<string, number>; preview_token?: string | null; explanation: string }>(`/api/lifestyle/reset-preview?${identityQuery(identity)}&reset_preferences=${resetPreferences}`),
   resetLifestyle: (payload: Record<string, unknown>) => request<{ deleted: Record<string, number>; preferences_reset: boolean }>("/api/lifestyle/reset", { method: "POST", body: JSON.stringify(payload) }),
   createSleep: (payload: Record<string, unknown>) => request("/api/lifestyle/sleep", { method: "POST", body: JSON.stringify(payload) }),
   updateSleep: (id: number, payload: Record<string, unknown>) => request(`/api/lifestyle/sleep/${id}`, { method: "PUT", body: JSON.stringify(payload) }),

@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import BrandLogo from "@/components/ui/BrandLogo";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { useAuth } from "@/context/AuthContext";
@@ -24,15 +24,14 @@ export default function AuthPageShell({
         <div className="grid w-full overflow-hidden rounded-[28px] border border-[var(--mc-border)] bg-[var(--mc-surface)] shadow-[0_24px_70px_rgba(27,18,37,0.12)] lg:grid-cols-[0.86fr_1.14fr]">
           <div className="hidden bg-[linear-gradient(145deg,#241a34,#4f2c51_60%,#6e3c66)] p-10 text-white lg:flex lg:flex-col lg:justify-between">
             <div>
-              <Image src="/maatru-care-logo.webp" alt="MaatruCare" width={720} height={240} className="h-auto w-56 brightness-0 invert" priority />
+              <BrandLogo onDark />
               <p className="mt-10 max-w-xs text-2xl font-semibold leading-tight tracking-[-0.03em]">Care coordination that keeps responsibility connected.</p>
             </div>
             <p className="max-w-sm text-xs leading-5 text-white/70">MaatruCare is an assistive coordination platform. It does not diagnose conditions, recommend treatment, or make clinical decisions.</p>
           </div>
           <div className="p-6 sm:p-10">
             <Link href="/sign-in" className="flex items-center gap-2 lg:hidden">
-              <Image src="/maatru-care-mark.webp" alt="" aria-hidden="true" width={512} height={512} className="h-9 w-9 object-contain" />
-              <span className="text-sm font-semibold">MaatruCare</span>
+              <BrandLogo compact />
             </Link>
             <div className="mt-8 max-w-md lg:mt-0">
               <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--mc-muted)]">{eyebrow}</p>

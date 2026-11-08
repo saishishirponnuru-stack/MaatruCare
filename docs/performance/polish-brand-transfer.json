@@ -1,0 +1,10 @@
+{
+  "baseline": {
+    "image_bytes": 88152,
+    "unique_images": 2
+  },
+  "polished": {
+    "image_bytes": 1564,
+    "unique_images": 1
+  }
+}

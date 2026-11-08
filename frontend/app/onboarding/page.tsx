@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, Suspense, useRef, useState } from "react";
+import { FormEvent, Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import AuthField from "@/components/auth/AuthField";
 import AuthPageShell from "@/components/auth/AuthPageShell";
@@ -21,10 +21,23 @@ function OnboardingForm() {
   const [invitationToken, setInvitationToken] = useState(searchParams.get("invitation") ?? "");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [seedAvailable, setSeedAvailable] = useState(false);
+  const [optionsReady, setOptionsReady] = useState(false);
+  const [optionsError, setOptionsError] = useState("");
+  useEffect(() => {
+    if (status !== "authenticated" || account || process.env.NEXT_PUBLIC_DEMO_CAREGIVERS_ENABLED !== "true") return;
+    let active = true;
+    void api.onboardingOptions().then(options => { if (active) { setSeedAvailable(options.seed_demo_caregivers); setOptionsReady(true); } }).catch(cause => {
+      if (active && cause instanceof ApiError && cause.status === 404) setOptionsReady(true); // Older backend has no automatic seeding.
+      else if (active) setOptionsError("Demonstration options are unavailable. Reload to retry, or leave this option unchecked.");
+    });
+    return () => { active = false; };
+  }, [status, account]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     if(lock.current || status !== "authenticated")return;
+    if (role === "patient" && demoWorkspace && !optionsReady) { setError("Demonstration options could not be loaded. Reload to try again."); return; }
     if(!name.trim()){setError("Enter your name.");return;}
     lock.current=true;setBusy(true);
     setError("");
@@ -73,7 +86,7 @@ function OnboardingForm() {
         {role === "patient" && <label className="mc-field">Current journey phase (optional)<select value={phase} onChange={(event) => setPhase(event.target.value)}><option value="">Choose later</option>{["Preconception", "Pregnancy", "Postnatal", "Early motherhood"].map((value) => <option key={value}>{value}</option>)}</select></label>}
         {!account && role === "patient" && process.env.NEXT_PUBLIC_DEMO_CAREGIVERS_ENABLED === "true" && <label className="flex cursor-pointer items-start gap-3 rounded-[12px] border border-[var(--mc-border)] p-3 text-xs">
           <input type="checkbox" checked={demoWorkspace} onChange={event => setDemoWorkspace(event.target.checked)} className="mt-0.5" />
-          <span><span className="block font-semibold">Create a fictional demonstration workspace</span><span className="mt-1 block text-[var(--mc-muted)]">Use made-up information only. Enables simulated caregivers; no sample records are added.</span></span>
+          <span><span className="block font-semibold">Create a fictional demonstration workspace</span><span className="mt-1 block text-[var(--mc-muted)]">{optionsError || (!optionsReady ? "Loading demonstration options…" : seedAvailable ? "Adds three fictional, simulated caregivers. Sharing starts off; you choose their permissions. Use made-up information only." : "Use made-up information only. Enables simulated caregivers; no sample records are added.")}</span></span>
         </label>}
         {role === "caregiver" && <AuthField label="Invitation code" value={invitationToken} onChange={setInvitationToken} autoComplete="one-time-code" />}
         <button type="submit" disabled={busy || status !== "authenticated"} className="h-11 w-full rounded-[12px] bg-[var(--mc-brand)] px-4 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-wait disabled:opacity-60">{busy ? "Saving…" : role === "caregiver" && invitationToken.trim() ? "Accept invitation" : "Continue to MaatruCare"}</button>

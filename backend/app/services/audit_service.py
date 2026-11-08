@@ -6,6 +6,7 @@ from ..models import AuditLog, TimelineEvent, Caregiver, CaregiverInvitation, Pe
 from .auth_service import get_current_account
 
 HISTORY_ACTIONS = {
+	"lifestyle_history_reset": "Lifestyle history cleared",
 	"permission_granted": "Sharing access enabled", "permission_revoked": "Sharing access disabled",
 	"invitation_created": "Caregiver invited", "invitation_withdrawn": "Invitation withdrawn",
 	"invitation_accepted": "Caregiver joined", "caregiver_removed": "Caregiver access revoked",

@@ -1,0 +1,94 @@
+{
+  "checks": [
+    {
+      "route": "/",
+      "status": 200,
+      "protected": true,
+      "final_path": "/sign-in"
+    },
+    {
+      "route": "/dashboard",
+      "status": 200,
+      "protected": true,
+      "final_path": "/sign-in"
+    },
+    {
+      "route": "/care-circle",
+      "status": 200,
+      "protected": true,
+      "final_path": "/sign-in"
+    },
+    {
+      "route": "/consent",
+      "status": 200,
+      "protected": true,
+      "final_path": "/sign-in"
+    },
+    {
+      "route": "/tasks",
+      "status": 200,
+      "protected": true,
+      "final_path": "/sign-in"
+    },
+    {
+      "route": "/handoffs",
+      "status": 200,
+      "protected": true,
+      "final_path": "/sign-in"
+    },
+    {
+      "route": "/timeline",
+      "status": 200,
+      "protected": true,
+      "final_path": "/sign-in"
+    },
+    {
+      "route": "/journey",
+      "status": 200,
+      "protected": true,
+      "final_path": "/sign-in"
+    },
+    {
+      "route": "/appointments",
+      "status": 200,
+      "protected": true,
+      "final_path": "/sign-in"
+    },
+    {
+      "route": "/lifestyle",
+      "status": 200,
+      "protected": true,
+      "final_path": "/sign-in"
+    },
+    {
+      "route": "/ai-assist",
+      "status": 200,
+      "protected": true,
+      "final_path": "/sign-in"
+    },
+    {
+      "route": "/settings",
+      "status": 200,
+      "protected": true,
+      "final_path": "/sign-in"
+    },
+    {
+      "route": "/profile",
+      "status": 200,
+      "protected": true,
+      "final_path": "/sign-in"
+    }
+  ],
+  "api": {
+    "health": 200,
+    "auth": 401
+  },
+  "uncaught_errors": [],
+  "request_hosts": [
+    "localhost:3002",
+    "127.0.0.1:8002"
+  ],
+  "production_backend_requests": 0,
+  "real_authentication_attempts": 0,
+  "application_mutations": 0
+}

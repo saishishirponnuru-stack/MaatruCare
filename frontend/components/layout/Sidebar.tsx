@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
+import BrandLogo from "@/components/ui/BrandLogo";
+import NavigationPending from "./NavigationPending";
 import { usePathname } from "next/navigation";
 import {
   Home,
@@ -61,14 +62,7 @@ export default function Sidebar({
           onClick={handleNavigate}
           className="flex min-w-0 items-center"
         >
-          <Image
-            src="/maatru-care-logo.webp"
-            alt="MaatruCare — Care together"
-            width={1818}
-            height={590}
-            priority
-            className="mc-brand-logo h-auto w-[184px] max-w-full"
-          />
+          <BrandLogo />
         </Link>
 
         <button
@@ -111,6 +105,7 @@ export default function Sidebar({
 
                   <span className={`mc-feature-icon mc-feature-icon--${item.iconTone} flex h-7 w-7 items-center justify-center rounded-[9px]`}><Icon size={16} strokeWidth={active ? 2.3 : 1.9} aria-hidden="true" /></span>
                   <span className="relative z-10">{item.label}</span>
+                  <NavigationPending label={item.label} />
                 </motion.div>
               </Link>
             );

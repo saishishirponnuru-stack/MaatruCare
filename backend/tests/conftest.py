@@ -22,6 +22,7 @@ os.environ["SUPABASE_AUDIENCE"] = "authenticated"
 os.environ["GEMINI_API_KEY"] = ""
 os.environ["RESEND_API_KEY"] = ""
 os.environ["MAATRUCARE_INVITATION_EMAIL_ENABLED"] = "false"
+os.environ["MAATRUCARE_DEMO_ONBOARDING_SEED_ENABLED"] = "false"
 
 
 def _assert_isolated_database() -> None:

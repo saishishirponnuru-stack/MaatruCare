@@ -13,7 +13,7 @@ def local_demo_reset_scope(monkeypatch):
 def confirmed_payload(client, reset_preferences):
     preview = client.get(f"/api/lifestyle/reset-preview?patient_id=1&actor_caregiver_id=1&reset_preferences={str(reset_preferences).lower()}")
     assert preview.status_code == 200 and preview.json()["enabled"]
-    return {"patient_id": 1, "actor_caregiver_id": 1, "reset_preferences": reset_preferences, "confirmed": True, "expected_counts": preview.json()["counts"]}
+    return {"patient_id": 1, "actor_caregiver_id": 1, "reset_preferences": reset_preferences, "confirmed": True, "expected_counts": preview.json()["counts"], "preview_token": preview.json()["preview_token"]}
 
 from fastapi.testclient import TestClient
 from datetime import date
@@ -64,7 +64,7 @@ def test_lifestyle_reset_is_scoped_and_repeatable(client: TestClient, monkeypatc
     assert reset.json()["deleted"]["water"] >= 1
 
     second = client.post("/api/lifestyle/reset", json=confirmed_payload(client, True))
-    assert second.status_code == 200
+    assert second.status_code == 409  # An empty/repeated deletion is not a new reset.
     payload = client.get("/api/lifestyle?patient_id=1&actor_caregiver_id=1").json()
     assert all(item["id"] != water.json()["id"] for item in payload["water"])
     assert any(item["id"] == recommendation.json()["id"] for item in payload["diet_recommendations"])

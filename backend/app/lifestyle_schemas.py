@@ -142,6 +142,7 @@ class LifestyleResetRequest(BaseModel):
     reset_preferences: bool = False
     confirmed: bool = False
     expected_counts: dict[str, int] | None = None
+    preview_token: str | None = Field(default=None, max_length=4096)
 
 
 class LifestyleResetResponse(BaseModel):

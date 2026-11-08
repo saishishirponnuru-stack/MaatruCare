@@ -7,6 +7,15 @@ const session={user:{id:"confirmed-subject",email:"fictional@example.test"}};
 const registration={email:" Fictional@Example.test ",password:"keep exact spaces ",confirmation:"keep exact spaces ",name:" Fictional Mother ",role:"patient"};
 const success={data:{session,user:session.user},error:null};
 
+for (const origin of ["http://localhost:3001", "http://localhost:3002", "https://maatru-care.vercel.app"]) {
+  test(`OAuth callback stays on its initiating origin: ${origin}`, () => {
+    const result=new URL(flow.callbackUrl(origin,"/care-circle"));
+    assert.equal(result.origin,origin);assert.equal(result.pathname,"/auth/callback");
+    assert.equal(result.searchParams.get("next"),"/care-circle");
+    assert.equal(new URL(flow.callbackUrl(origin,"https://untrusted.example")).searchParams.get("next"),"/dashboard");
+  });
+}
+
 test("registration validates email, password confirmation, name and caregiver invitation before contacting Supabase",async()=>{
   let called=0;const auth={signUp:async()=>{called++;return success;}};
   for(const change of [{email:"bad"},{password:"short",confirmation:"short"},{confirmation:"different"},{name:" "},{role:"caregiver",invitation:""}]) {
