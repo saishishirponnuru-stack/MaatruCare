@@ -114,6 +114,7 @@ export type MaatruCareDemoContextValue = {
   timelineError: string;
   taskError: string;
   handoffError: string;
+  syncSavedTask: (task: ApiTask) => void;
 
   addTask: (
     task: Omit<DemoTask, "id" | "status" | "createdBy">
@@ -523,6 +524,7 @@ export function MaatruCareDemoProvider({
     throw new Error("Choose an active member of your Care Circle.");
   }
   function mergeTask(saved: ApiTask) {
+    if (!identity || saved.patient_id !== identity.patientId) throw new Error("This task does not belong to your current workspace.");
     const mapped = mapTask(saved, caregiverRecords, patientName);
     setTasks((previous) => [mapped, ...previous.filter((item) => item.id !== mapped.id)]);
     void api.getTimeline(identity!, 15, 0).then((events) => setTimeline(events.map(mapTimelineEvent))).catch(() => setTimelineError("History could not be refreshed. Try again."));
@@ -688,6 +690,7 @@ export function MaatruCareDemoProvider({
       taskError,
       handoffError,
       addTask,
+      syncSavedTask: mergeTask,
       updateTask,
       completeTask,
       deleteTask,

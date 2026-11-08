@@ -22,3 +22,5 @@ coverage
 **/theme-checkpoint-*
 **/local-backups
 *.log
+
+.next-browser-tests-dev/

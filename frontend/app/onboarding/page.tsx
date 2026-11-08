@@ -5,12 +5,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import AuthField from "@/components/auth/AuthField";
 import AuthPageShell from "@/components/auth/AuthPageShell";
 import { useAuth } from "@/context/AuthContext";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 
 function OnboardingForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { account, email, suggestedName, refreshAccount } = useAuth();
+  const { account, email, suggestedName, refreshAccount, status } = useAuth();
   const [demoWorkspace, setDemoWorkspace] = useState(false);
   const [phase, setPhase] = useState("");
   const [name, setName] = useState(suggestedName);
@@ -24,12 +24,24 @@ function OnboardingForm() {
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if(lock.current)return;
+    if(lock.current || status !== "authenticated")return;
     if(!name.trim()){setError("Enter your name.");return;}
     lock.current=true;setBusy(true);
     setError("");
     try {
-      await api.bootstrapAccount({ name: name.trim(), role, invitation_token: invitationToken.trim() || undefined, demo_workspace: role === "patient" && demoWorkspace });
+      if (role === "caregiver" && account) {
+        // Bootstrap is idempotent account setup, not an invitation acceptance
+        // operation for a linked profile. Preserve its binding on rejection.
+        try { await api.acceptCaregiverInvitation(invitationToken.trim()); }
+        catch (cause) {
+          if (cause instanceof ApiError && cause.status === 409 && cause.message === "Account is already linked") {
+            throw new Error("This account already belongs to a Care Circle. Joining an additional Care Circle is not supported yet. This invitation has not been accepted and your existing access is unchanged.");
+          }
+          throw cause;
+        }
+      } else {
+        await api.bootstrapAccount({ name: name.trim(), role, invitation_token: invitationToken.trim() || undefined, demo_workspace: role === "patient" && demoWorkspace });
+      }
       if (role === "patient" && phase) await api.updateProfile({ name: name.trim(), current_phase: phase });
       await refreshAccount();
       router.replace("/dashboard");
@@ -44,7 +56,7 @@ function OnboardingForm() {
     <AuthPageShell eyebrow="Finish setup" title="Complete your care profile" description={`Signed in as ${email ?? "your account"}. Choose how this account should be connected.`}>
       <form onSubmit={submit} className="space-y-4">
         {error && <p role="alert" className="rounded-[12px] border border-[#E7C8CC] bg-[#FFF5F5] p-3 text-xs text-[#9D4B55]">{error}</p>}
-        <fieldset disabled={busy} className="space-y-4">
+        <fieldset disabled={busy || status !== "authenticated"} className="space-y-4">
         <AuthField label="Full name" value={name} onChange={setName} autoComplete="name" />
         <fieldset>
           <legend className="text-xs font-semibold text-[var(--mc-text)]">Account type</legend>
@@ -64,7 +76,7 @@ function OnboardingForm() {
           <span><span className="block font-semibold">Create a fictional demonstration workspace</span><span className="mt-1 block text-[var(--mc-muted)]">Use made-up information only. Enables simulated caregivers; no sample records are added.</span></span>
         </label>}
         {role === "caregiver" && <AuthField label="Invitation code" value={invitationToken} onChange={setInvitationToken} autoComplete="one-time-code" />}
-        <button type="submit" disabled={busy} className="h-11 w-full rounded-[12px] bg-[var(--mc-brand)] px-4 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-wait disabled:opacity-60">{busy ? "Saving…" : "Continue to MaatruCare"}</button>
+        <button type="submit" disabled={busy || status !== "authenticated"} className="h-11 w-full rounded-[12px] bg-[var(--mc-brand)] px-4 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-wait disabled:opacity-60">{busy ? "Saving…" : role === "caregiver" && invitationToken.trim() ? "Accept invitation" : "Continue to MaatruCare"}</button>
         </fieldset>
       </form>
     </AuthPageShell>

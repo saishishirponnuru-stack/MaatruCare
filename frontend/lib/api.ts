@@ -1,4 +1,5 @@
 import { getSupabaseBrowserClient, readSupabaseSession } from "./supabase";
+import { ReadCoalescer } from "./read-coalescer";
 
 export type ApiAuthAccount = {
   phone?: string | null;
@@ -218,6 +219,7 @@ export type ApiPermissionUpdate = {
 
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000").replace(/\/$/, "");
 let refreshSessionRequest: { subject: string; promise: Promise<string | null> } | null = null;
+const concurrentReads = new ReadCoalescer();
 
 export class ApiError extends Error {
   status: number;
@@ -234,8 +236,21 @@ function identityQuery(identity: ApiIdentity) {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const supabase = getSupabaseBrowserClient();
   const session = await readSupabaseSession();
+  const method = (init?.method ?? "GET").toUpperCase();
+  if (method !== "GET" && method !== "HEAD") {
+    concurrentReads.invalidate();
+    try { return await executeRequest<T>(path, init, session); }
+    finally { concurrentReads.invalidate(); }
+  }
+  // Custom headers/signals may belong to a single consumer; never combine them.
+  if (init && Object.keys(init).some(key => key !== "method")) return executeRequest<T>(path, init, session);
+  const key = `${session?.user.id ?? "anonymous"}\0${session?.access_token ?? ""}\0${method}\0${path}`;
+  return concurrentReads.read(key, () => executeRequest<T>(path, init, session));
+}
+
+async function executeRequest<T>(path: string, init: RequestInit | undefined, session: Awaited<ReturnType<typeof readSupabaseSession>>): Promise<T> {
+  const supabase = getSupabaseBrowserClient();
   const subject = session?.user.id;
   let accessToken = session?.access_token;
 
@@ -312,6 +327,7 @@ export const api = {
     request<{ token: string; email: string; email_status: ApiCaregiverInvitation["email_status"]; email_accepted_at: string | null }>("/api/auth/invitations", { method: "POST", body: JSON.stringify(payload) }),
   invitationDelivery: () => request<{email_available: boolean; simulated_available: boolean; explanation: string}>("/api/auth/invitation-delivery"),
   withdrawCaregiverInvitation: (id: number) => request(`/api/auth/invitations/${id}/withdraw`, { method: "POST" }),
+  acceptCaregiverInvitation: (token: string) => request<ApiAuthAccount>(`/api/auth/invitations/${encodeURIComponent(token)}/accept`, { method: "POST" }),
   getCaregiverInvitations: (identity: ApiIdentity) =>
     request<ApiCaregiverInvitation[]>(`/api/auth/invitations?${identityQuery(identity)}`),
   generateCoordinationSummary: (note: string) =>

@@ -1,0 +1,194 @@
+{
+  "mode": "development",
+  "dashboard_ms": 2195,
+  "initial_api_requests": [
+    {
+      "path": "/api/auth/me",
+      "method": "GET",
+      "started": 1794119101418,
+      "duration": 11
+    },
+    {
+      "path": "/api/appointments",
+      "method": "GET",
+      "started": 1794119101564,
+      "duration": 38
+    },
+    {
+      "path": "/api/appointments",
+      "method": "GET",
+      "started": 1794119101564,
+      "duration": 45
+    },
+    {
+      "path": "/api/analytics",
+      "method": "GET",
+      "started": 1794119101569,
+      "duration": 143
+    },
+    {
+      "path": "/api/lifestyle",
+      "method": "GET",
+      "started": 1794119101569,
+      "duration": 106
+    },
+    {
+      "path": "/api/caregivers",
+      "method": "GET",
+      "started": 1794119101570,
+      "duration": 70
+    },
+    {
+      "path": "/api/tasks",
+      "method": "GET",
+      "started": 1794119101571,
+      "duration": 70
+    },
+    {
+      "path": "/api/handoffs",
+      "method": "GET",
+      "started": 1794119101571,
+      "duration": 101
+    },
+    {
+      "path": "/api/timeline",
+      "method": "GET",
+      "started": 1794119101571,
+      "duration": 105
+    },
+    {
+      "path": "/api/permissions",
+      "method": "GET",
+      "started": 1794119101571,
+      "duration": 123
+    },
+    {
+      "path": "/api/permissions/history",
+      "method": "GET",
+      "started": 1794119101571,
+      "duration": 123
+    }
+  ],
+  "range_change_requests": [
+    {
+      "path": "/api/analytics",
+      "method": "GET",
+      "started": 1794119101768,
+      "duration": 17
+    },
+    {
+      "path": "/api/lifestyle",
+      "method": "GET",
+      "started": 1794119101768,
+      "duration": 15
+    }
+  ],
+  "navigation": [
+    {
+      "route": "/ai-assist",
+      "ms": 1094,
+      "api_requests": []
+    },
+    {
+      "route": "/handoffs",
+      "ms": 763,
+      "api_requests": [
+        "/api/ai/drafts",
+        "/api/ai/drafts"
+      ]
+    },
+    {
+      "route": "/tasks",
+      "ms": 684,
+      "api_requests": []
+    },
+    {
+      "route": "/care-circle",
+      "ms": 617,
+      "api_requests": []
+    },
+    {
+      "route": "/dashboard",
+      "ms": 181,
+      "api_requests": [
+        "/api/auth/invitations",
+        "/api/auth/invitation-delivery"
+      ]
+    },
+    {
+      "route": "/ai-assist",
+      "ms": 180,
+      "api_requests": [
+        "/api/appointments",
+        "/api/appointments",
+        "/api/analytics",
+        "/api/lifestyle",
+        "/api/ai/drafts",
+        "/api/ai/drafts"
+      ]
+    }
+  ],
+  "task_save_ms": 212,
+  "task_save_requests": [
+    {
+      "path": "/api/tasks",
+      "method": "POST",
+      "started": 1794119105724,
+      "duration": 24
+    },
+    {
+      "path": "/api/ai/drafts/1",
+      "method": "GET",
+      "started": 1794119105750,
+      "duration": 8
+    },
+    {
+      "path": "/api/caregivers",
+      "method": "GET",
+      "started": 1794119105759,
+      "duration": 39
+    },
+    {
+      "path": "/api/tasks",
+      "method": "GET",
+      "started": 1794119105759,
+      "duration": 39
+    },
+    {
+      "path": "/api/handoffs",
+      "method": "GET",
+      "started": 1794119105760,
+      "duration": 38
+    },
+    {
+      "path": "/api/timeline",
+      "method": "GET",
+      "started": 1794119105760,
+      "duration": 38
+    },
+    {
+      "path": "/api/permissions",
+      "method": "GET",
+      "started": 1794119105760,
+      "duration": 36
+    },
+    {
+      "path": "/api/permissions/history",
+      "method": "GET",
+      "started": 1794119105760,
+      "duration": 42
+    },
+    {
+      "path": "/api/analytics/facts",
+      "method": "GET",
+      "started": 1794119105770,
+      "duration": 46
+    },
+    {
+      "path": "/api/analytics/facts",
+      "method": "GET",
+      "started": 1794119105811,
+      "duration": 12
+    }
+  ]
+}

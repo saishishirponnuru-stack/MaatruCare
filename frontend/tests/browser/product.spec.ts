@@ -161,7 +161,7 @@ test("an invited authenticated caregiver joins and completes their own real hand
   await installSession(page, recipientSession);
   await page.goto(`/onboarding?invitation=${encodeURIComponent((await invitation.json()).token)}`);
   await page.getByLabel("Full name", {exact: true}).fill("Fictional Recipient");
-  await page.getByRole("button", {name: "Continue to MaatruCare"}).click();
+  await page.getByRole("button", {name: "Accept invitation", exact: true}).click();
   await page.waitForURL("**/dashboard");
   const members = await page.request.get(`http://127.0.0.1:18010/api/caregivers?actor_caregiver_id=${owner.account.caregiver_id}`, {headers});
   const recipient = (await members.json()).find((member: {name: string}) => member.name === "Fictional Recipient");

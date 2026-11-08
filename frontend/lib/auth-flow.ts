@@ -25,6 +25,9 @@ export function onboardingDestination(next?: string | null) {
 
 export function authDestination(linked: boolean, next?: string | null) {
   const safe = safeAuthNext(next);
+  // A valid invitation is an explicit join intent, even for an existing user.
+  // Do not mistake a linked profile for successful invitation acceptance.
+  if (safe.startsWith("/onboarding?") && new URLSearchParams(safe.split("?")[1]).has("invitation")) return safe;
   return linked ? safe.startsWith("/onboarding") ? "/dashboard" : safe : onboardingDestination(safe);
 }
 

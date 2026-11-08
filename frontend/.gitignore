@@ -46,3 +46,5 @@ next-env.d.ts
 /.next-browser-tests/
 /.browser-test-results/
 /playwright-report/
+
+.next-browser-tests-dev/

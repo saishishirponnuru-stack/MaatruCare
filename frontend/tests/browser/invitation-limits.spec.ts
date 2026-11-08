@@ -1,0 +1,37 @@
+import {expect, test} from "./fixtures";
+import {createOwner, installSession} from "./helpers";
+
+test("existing recipient sees explicit single-Circle rejection and keeps original access", async ({page}) => {
+  const a = await createOwner(page, "Fictional Circle A");
+  const b = await createOwner(page, "Fictional Circle B");
+  const response = await page.request.get("http://127.0.0.1:18010/__fixture/session?fresh=true");
+  const session = await response.json();
+  const headersA = {Authorization: `Bearer ${a.session.access_token}`};
+  const headersB = {Authorization: `Bearer ${b.session.access_token}`};
+  const recipientHeaders = {Authorization: `Bearer ${session.access_token}`};
+  const first = await page.request.post("http://127.0.0.1:18010/api/auth/invitations", {headers: headersA, data: {email: session.user.email, name: "Fictional Existing Caregiver"}});
+  expect(first.ok()).toBeTruthy();
+  const accepted = await page.request.post(`http://127.0.0.1:18010/api/auth/invitations/${(await first.json()).token}/accept`, {headers: recipientHeaders});
+  expect(accepted.ok()).toBeTruthy();
+  const recipient = await accepted.json();
+  expect((await page.request.put("http://127.0.0.1:18010/api/permissions", {headers: headersA, data: {patient_id: a.account.patient_id, actor_caregiver_id: a.account.caregiver_id, caregiver_id: recipient.caregiver_id, permission_name: "Coordination tasks", enabled: true}})).ok()).toBeTruthy();
+  const second = await page.request.post("http://127.0.0.1:18010/api/auth/invitations", {headers: headersB, data: {email: session.user.email, name: "Fictional Existing Caregiver", relationship: "Friend"}});
+  expect(second.ok()).toBeTruthy(); const token = (await second.json()).token;
+  await installSession(page, session);
+  await page.goto(`/onboarding?role=caregiver&invitation=${token}`);
+  await page.getByLabel("Full name", {exact: true}).fill("Fictional Existing Caregiver");
+  let bootstraps = 0;
+  page.on("request", r => {if (new URL(r.url()).pathname === "/api/auth/bootstrap" && r.method() === "POST") bootstraps++;});
+  const acceptance = page.waitForResponse(r => r.request().method() === "POST" && /\/api\/auth\/invitations\/.+\/accept$/.test(new URL(r.url()).pathname));
+  await page.getByRole("button", {name: "Accept invitation", exact: true}).click();
+  expect((await acceptance).status()).toBe(409);
+  await expect(page.getByRole("alert").filter({hasText: "Joining an additional Care Circle is not supported yet"})).toBeVisible();
+  await expect(page).toHaveURL(new RegExp("/onboarding\\?role=caregiver&invitation="));
+  expect(bootstraps).toBe(0);
+  const pending = await page.request.get("http://127.0.0.1:18010/api/auth/invitations", {headers: headersB});
+  expect((await pending.json()).filter((item: {status: string}) => item.status === "Pending")).toHaveLength(1);
+  const blocked = await page.request.post(`http://127.0.0.1:18010/api/auth/invitations/${token}/accept`, {headers: recipientHeaders});
+  expect(blocked.status()).toBe(409);
+  const restored = await page.request.get("http://127.0.0.1:18010/api/auth/me", {headers: recipientHeaders});
+  expect((await restored.json()).patient_id).toBe(a.account.patient_id);
+});

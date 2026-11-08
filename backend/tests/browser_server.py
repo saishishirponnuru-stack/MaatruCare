@@ -44,10 +44,10 @@ from app.services.ai_service import AIProviderError
 
 def fixture_generate_workspace(note, operation, language):
     source = "Prepare the fictional folder for the visit."
-    if note != f"Fictional coordination note: {source}" or operation not in {"extract_tasks", "care_plan"}:
+    if note != f"Fictional coordination note: {source}" or operation not in {"extract_tasks", "care_plan", "summarize", "appointment_prep", "handoff_draft", "update_draft", "nutrition_notes"}:
         raise AIProviderError("provider unavailable")
-    return {"summary": source, "facts": [{"text": source, "source_quote": source}],
-            "suggestions": [{"title": "Prepare fictional folder", "kind": "From note", "source_quote": source, "assignee_name": None, "due_date": None}]}
+    return {"summary": source, "care_update": source if operation == "update_draft" else "", "handoff_summary": source if operation == "handoff_draft" else "", "handoff_title": "Fictional folder handoff" if operation == "handoff_draft" else None, "facts": [{"text": source, "source_quote": source}],
+            "suggestions": [{"title": "Prepare fictional folder", "kind": "From note", "source_quote": source, "assignee_name": None, "due_date": None}] if operation in {"summarize", "extract_tasks", "appointment_prep", "care_plan"} else []}
 
 fixture_ai.generate_workspace = fixture_generate_workspace
 

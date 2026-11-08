@@ -1,0 +1,75 @@
+{
+  "method": "Anonymous read-only HTTP against existing user dev servers; no cookies/tokens; document timings include SSR/compilation, not authenticated readiness",
+  "samples": [
+    {
+      "route": "/dashboard",
+      "attempt": 1,
+      "http": 200,
+      "document_ms": 163.7
+    },
+    {
+      "route": "/dashboard",
+      "attempt": 2,
+      "http": 200,
+      "document_ms": 102.4
+    },
+    {
+      "route": "/ai-assist",
+      "attempt": 1,
+      "http": 200,
+      "document_ms": 196.0
+    },
+    {
+      "route": "/ai-assist",
+      "attempt": 2,
+      "http": 200,
+      "document_ms": 70.3
+    },
+    {
+      "route": "/handoffs",
+      "attempt": 1,
+      "http": 200,
+      "document_ms": 251.8
+    },
+    {
+      "route": "/handoffs",
+      "attempt": 2,
+      "http": 200,
+      "document_ms": 136.8
+    },
+    {
+      "route": "/tasks",
+      "attempt": 1,
+      "http": 200,
+      "document_ms": 218.5
+    },
+    {
+      "route": "/tasks",
+      "attempt": 2,
+      "http": 200,
+      "document_ms": 112.3
+    },
+    {
+      "route": "/care-circle",
+      "attempt": 1,
+      "http": 200,
+      "document_ms": 130.4
+    },
+    {
+      "route": "/care-circle",
+      "attempt": 2,
+      "http": 200,
+      "document_ms": 67.9
+    },
+    {
+      "route": "/api/health",
+      "http": 200,
+      "api_ms": 36.9
+    },
+    {
+      "route": "/api/auth/me",
+      "http": 401,
+      "api_ms": 6.1
+    }
+  ]
+}

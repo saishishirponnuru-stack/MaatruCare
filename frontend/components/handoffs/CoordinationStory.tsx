@@ -40,7 +40,7 @@ export default function CoordinationStory({ handoff }: { handoff: DemoHandoff })
     : handoff.stage === "Sent" ? `Waiting for ${handoff.to} to acknowledge${handoff.toDemo ? " (simulation available)" : ""}.`
     : handoff.stage === "Acknowledged" ? `${handoff.to} can complete the responsibility${handoff.toDemo ? " through a simulation" : ""}.`
     : "The handoff is complete. Any linked task keeps its own status.";
-  return <section aria-label="Care Coordination Story" className="border-y border-[var(--mc-border)] py-5">
+  return <section aria-label="Care Coordination Story" className="min-w-0 border-y border-[var(--mc-border)] py-5 [overflow-wrap:anywhere]">
     <h3 className="text-base font-semibold">Care Coordination Story</h3>
     <p className="mc-caption mt-2">{next}</p>
     <ol className="mc-action-timeline mt-5" aria-label="Handoff progress">{steps.map(step => <li key={step.title} className="mc-action-timeline__event" aria-current={!closed && handoff.stage === step.title ? "step" : undefined}>
