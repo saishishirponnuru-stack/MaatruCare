@@ -1,0 +1,10 @@
+{
+  "google_provider_enabled": true,
+  "email_provider_enabled": true,
+  "email_confirmation_required": true,
+  "actual_auth_attempts": 0,
+  "invitation_provider_key_configured": false,
+  "invitation_sender_configured": false,
+  "invitation_delivery_explicitly_enabled": false,
+  "ai_provider_configured": true
+}

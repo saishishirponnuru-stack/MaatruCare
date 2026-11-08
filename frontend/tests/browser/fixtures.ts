@@ -13,7 +13,8 @@ export const test = base.extend<{browserDiagnostics: void}>({
       const deliberate = (info.title.includes("failed refresh") && path === "/api/lifestyle")
         || (info.title.includes("failed API load") && path === "/api/tasks")
         || (info.title.includes("AI provider failure") && path === "/api/ai/workspace")
-        || (info.title.includes("failed review") && /\/api\/ai\/drafts\/\d+\/review$/.test(path));
+        || (info.title.includes("failed review") && /\/api\/ai\/drafts\/\d+\/review$/.test(path))
+        || (info.title.includes("failed draft reload") && /\/api\/ai\/drafts\/\d+$/.test(path));
       if (!deliberate) errors.push(`Unexpected HTTP ${response.status()} at ${path}`);
     });
     await use();

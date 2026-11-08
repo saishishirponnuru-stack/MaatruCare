@@ -1,0 +1,119 @@
+{
+  "kind": "Live anonymous, unmodified network, all mutations prohibited",
+  "timing": {
+    "ttfb_ms": 61.59999990463257,
+    "dcl_ms": 575.6999999284744,
+    "load_ms": 576,
+    "js_transfer_bytes": 290803
+  },
+  "routes": [
+    {
+      "path": "/dashboard",
+      "protected": true,
+      "duration_ms": 499
+    },
+    {
+      "path": "/care-circle",
+      "protected": true,
+      "duration_ms": 632
+    },
+    {
+      "path": "/tasks",
+      "protected": true,
+      "duration_ms": 479
+    },
+    {
+      "path": "/handoffs",
+      "protected": true,
+      "duration_ms": 488
+    },
+    {
+      "path": "/timeline",
+      "protected": true,
+      "duration_ms": 484
+    },
+    {
+      "path": "/ai-assist",
+      "protected": true,
+      "duration_ms": 474
+    },
+    {
+      "path": "/consent",
+      "protected": true,
+      "duration_ms": 530
+    },
+    {
+      "path": "/lifestyle",
+      "protected": true,
+      "duration_ms": 482
+    },
+    {
+      "path": "/settings",
+      "protected": true,
+      "duration_ms": 939
+    },
+    {
+      "path": "/profile",
+      "protected": true,
+      "duration_ms": 990
+    },
+    {
+      "path": "/journey",
+      "protected": true,
+      "duration_ms": 1255
+    },
+    {
+      "path": "/appointments",
+      "protected": true,
+      "duration_ms": 991
+    }
+  ],
+  "themes": [
+    {
+      "width": 375,
+      "theme": "dark",
+      "overflow": false
+    },
+    {
+      "width": 375,
+      "theme": "light",
+      "overflow": false
+    },
+    {
+      "width": 768,
+      "theme": "dark",
+      "overflow": false
+    },
+    {
+      "width": 768,
+      "theme": "light",
+      "overflow": false
+    },
+    {
+      "width": 1024,
+      "theme": "dark",
+      "overflow": false
+    },
+    {
+      "width": 1024,
+      "theme": "light",
+      "overflow": false
+    },
+    {
+      "width": 1440,
+      "theme": "dark",
+      "overflow": false
+    },
+    {
+      "width": 1440,
+      "theme": "light",
+      "overflow": false
+    }
+  ],
+  "network": {
+    "auth_status": 401,
+    "health_status": 200
+  },
+  "errors": [],
+  "expected401": 1
+}

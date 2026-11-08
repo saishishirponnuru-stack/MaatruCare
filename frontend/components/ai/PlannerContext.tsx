@@ -34,7 +34,7 @@ export default function PlannerContext({ onBrief, disabled }: { onBrief: (note: 
       : "Help organize responsibilities for this week. Use only new responsibilities I add below; ask for missing information rather than inventing tasks or dates.";
     onBrief(`${context}\n${request}\nAdditional fictional or de-identified responsibilities: `);
   }
-  return <Panel title="AI Care Planner" className="mb-5" description={`Welcome, ${account?.name?.split(/\s+/)[0] || "there"}. Start with your saved responsibilities, then review a note before asking Gemini for suggestions.`}>
+  return <Panel title="AI Care Planner" className="mb-5 [overflow-wrap:anywhere]" description={`Welcome, ${account?.name?.split(/\s+/)[0] || "there"}. Start with your saved responsibilities, then review a note before asking Gemini for suggestions.`}>
     <Message error>{error}</Message>
     {!ready ? <p role="status" className="mc-caption">Loading your authorized planning context…</p> : facts && !error && <div className="grid gap-4 md:grid-cols-3">
       <div><h3 className="text-sm font-semibold">Open responsibilities</h3>{facts.available_categories.includes("Coordination tasks") ? <><p className="mc-caption mt-2">{facts.tasks.length} recorded</p>{facts.tasks.slice(0, 3).map(item => <p key={item.id} className="mc-caption mt-2 break-words">{item.title} · {item.owner} · {item.due_date}</p>)}</> : <p className="mc-caption mt-2">Not shared with this account.</p>}<Link prefetch={false} href="/tasks" className="mc-caption mt-3 inline-block underline">Review Tasks</Link></div>

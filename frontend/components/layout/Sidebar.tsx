@@ -159,6 +159,7 @@ export default function Sidebar({
         aria-hidden={!mobileOpen}
         disabled={!mobileOpen}
         onClick={onClose}
+        style={{ opacity: mobileOpen ? 1 : 0 }}
         className={`fixed inset-0 z-40 bg-[#211C1F]/25 transition-opacity duration-200 lg:hidden ${
           mobileOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
         }`}
