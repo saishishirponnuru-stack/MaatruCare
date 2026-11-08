@@ -58,7 +58,7 @@ export default function Topbar({
           {mobileMenuOpen ? <X size={19} /> : <Menu size={19} />}
         </motion.button>
 
-        <Link href="/dashboard" aria-label="MaatruCare home" className="flex min-w-0 items-center gap-2.5 lg:hidden">
+        <Link href="/dashboard" prefetch={false} aria-label="MaatruCare home" className="flex min-w-0 items-center gap-2.5 lg:hidden">
           <Image
             src="/maatru-care-mark.webp"
             alt=""
@@ -93,7 +93,7 @@ export default function Topbar({
         >
           {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
         </motion.button>
-        <Link href="/profile" aria-label="View care profile" title="View care profile" className="hidden h-10 items-center gap-2 rounded-[11px] border border-[var(--mc-border)] bg-[var(--mc-surface)] px-3 text-xs font-semibold text-[var(--mc-brand)] transition hover:bg-[var(--mc-surface-muted)] lg:flex">
+        <Link href="/profile" prefetch={false} aria-label="View care profile" title="View care profile" className="hidden h-10 items-center gap-2 rounded-[11px] border border-[var(--mc-border)] bg-[var(--mc-surface)] px-3 text-xs font-semibold text-[var(--mc-brand)] transition hover:bg-[var(--mc-surface-muted)] lg:flex">
           <UserRound size={16} />
           <span className="max-w-36 truncate">{account?.name ?? "Care profile"}</span>
         </Link>

@@ -4,6 +4,7 @@ from sqlalchemy import inspect, text
 
 def migrate_schema(engine):
     additions = {
+        "patients": {"is_demo_workspace": "BOOLEAN NOT NULL DEFAULT FALSE"},
         "accounts": {"phone": "VARCHAR(32)"},
         "caregiver_invitations": {"relationship": "VARCHAR(100) NOT NULL DEFAULT 'Family caregiver'", "withdrawn_at": "TIMESTAMP", "email_status": "VARCHAR(30) NOT NULL DEFAULT 'not_requested'", "email_accepted_at": "TIMESTAMP", "provider_message_id": "VARCHAR(255)"},
         "caregivers": {"role": "VARCHAR(100) NOT NULL DEFAULT 'Caregiver'", "is_demo": "BOOLEAN NOT NULL DEFAULT FALSE", "is_patient": "BOOLEAN NOT NULL DEFAULT FALSE"},

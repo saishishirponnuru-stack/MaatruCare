@@ -21,6 +21,7 @@ export interface AccessibilityPreferences {
 
 interface PreferencesContextValue extends AccessibilityPreferences {
   hydrated: boolean;
+  storageError: string;
   setTheme: (theme: ThemeMode) => void;
   toggleTheme: () => void;
   setLargerText: (enabled: boolean) => void;
@@ -48,24 +49,20 @@ export function PreferencesProvider({
   const [preferences, setPreferences] =
     useState<AccessibilityPreferences>(defaults);
   const [hydrated, setHydrated] = useState(false);
+  const [storageError, setStorageError] = useState("");
 
   useEffect(() => {
+    const systemReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    let next = { ...defaults, reducedMotion: systemReducedMotion };
+    let error = "";
     try {
       const stored = window.localStorage.getItem(STORAGE_KEY);
-      const systemReducedMotion = window.matchMedia?.(
-        "(prefers-reduced-motion: reduce)",
-      ).matches ?? false;
-
       if (stored) {
         const parsed: unknown = JSON.parse(stored);
-
         if (parsed && typeof parsed === "object") {
           const value = parsed as Partial<AccessibilityPreferences>;
-
-          // Hydrate browser-only preferences after mount to avoid SSR/client markup mismatch.
-          // eslint-disable-next-line react-hooks/set-state-in-effect
-          setPreferences({
-            theme: value.theme === "dark" ? "dark" : "light",
+          next = {
+            theme: value.theme === "light" || value.theme === "dark" ? value.theme : defaults.theme,
             largerText:
               typeof value.largerText === "boolean"
                 ? value.largerText
@@ -78,16 +75,16 @@ export function PreferencesProvider({
               typeof value.reducedMotion === "boolean"
                 ? value.reducedMotion
                 : systemReducedMotion,
-          });
-      } else {
-        // Use the operating-system accessibility preference until the user chooses otherwise.
-        setPreferences({ ...defaults, reducedMotion: systemReducedMotion });
-      }
+          };
+        }
       }
     } catch {
-      // Continue with defaults if stored preferences are unavailable.
+      error = "Saved browser preferences could not be read. Default preferences apply for this visit.";
     }
-
+    // Hydrate after mount, including the first visit and malformed stored data.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPreferences(next);
+    setStorageError(error);
     setHydrated(true);
   }, []);
 
@@ -102,14 +99,17 @@ export function PreferencesProvider({
     root.dataset.reducedMotion = String(preferences.reducedMotion);
     root.style.colorScheme = preferences.theme;
 
+    let error = "";
     try {
       window.localStorage.setItem(
         STORAGE_KEY,
         JSON.stringify(preferences),
       );
     } catch {
-      // Preferences still work for the current session if storage is unavailable.
+      error = "Browser preferences could not be saved. Changes apply for this visit.";
     }
+    const timer = window.setTimeout(() => setStorageError(error), 0);
+    return () => window.clearTimeout(timer);
   }, [preferences, hydrated]);
 
   const updatePreference = useCallback(
@@ -154,6 +154,7 @@ export function PreferencesProvider({
       value={{
         ...preferences,
         hydrated,
+        storageError,
         setTheme,
         toggleTheme,
         setLargerText,

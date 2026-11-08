@@ -6,6 +6,9 @@
 node_modules
 .next
 .next-qa
+.next-browser-tests
+.browser-test-results
+playwright-report
 .next.backup-*
 out
 build

@@ -156,7 +156,7 @@ function AppointmentEditor({ mode, form, setForm, saving, error, onClose, onSubm
 }
 
 function CancelConfirmation({ appointment, cancelling, error, onClose, onConfirm }: { appointment: ApiAppointment; cancelling: boolean; error?: string; onClose: () => void; onConfirm: () => void }) {
-  return <Drawer title="Cancel this appointment?" onClose={() => { if (!cancelling) onClose(); }}><p className="mc-caption">Cancel ?{appointment.title}? with {appointment.clinician_name}? The appointment remains in your history.</p><Message error>{error}</Message><div className="mt-6 flex flex-wrap gap-2"><Button variant="secondary" disabled={cancelling} onClick={onClose}>Keep appointment</Button><Button variant="danger" disabled={cancelling} onClick={onConfirm}>{cancelling ? "Cancelling..." : "Confirm cancel"}</Button></div></Drawer>;
+  return <Drawer title="Cancel this appointment?" onClose={() => { if (!cancelling) onClose(); }}><p className="mc-caption">Cancel &quot;{appointment.title}&quot; with {appointment.clinician_name}? The appointment remains in your history.</p><Message error>{error}</Message><div className="mt-6 flex flex-wrap gap-2"><Button variant="secondary" disabled={cancelling} onClick={onClose}>Keep appointment</Button><Button variant="danger" disabled={cancelling} onClick={onConfirm}>{cancelling ? "Cancelling..." : "Confirm cancel"}</Button></div></Drawer>;
 }
 
 function Detail({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) {

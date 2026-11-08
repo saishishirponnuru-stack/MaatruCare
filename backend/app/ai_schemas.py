@@ -2,7 +2,7 @@ from datetime import date
 from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
-Operation = Literal["summarize", "extract_tasks", "appointment_prep", "handoff_draft", "update_draft", "nutrition_notes"]
+Operation = Literal["summarize", "extract_tasks", "appointment_prep", "handoff_draft", "update_draft", "nutrition_notes", "care_plan"]
 
 
 class WorkspaceRequest(BaseModel):

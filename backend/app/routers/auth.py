@@ -12,7 +12,7 @@ from ..models import Account, Caregiver, CaregiverInvitation, Patient, Permissio
 from ..services.access_service import is_workspace_owner, require_patient_controller
 from ..services.audit_service import record_audit
 from ..services.invitation_email_service import delivery_capability, send_invitation_email, InvitationEmailError
-from ..services.demo_caregiver_service import demo_caregivers_available
+from ..services.demo_caregiver_service import demo_caregivers_available, demo_mode_enabled
 from ..services.auth_service import (
 	hash_invitation,
 	new_invitation_token,
@@ -26,6 +26,7 @@ class BootstrapRequest(BaseModel):
 	role: str = Field(pattern="^(patient|caregiver)$")
 	name: str = Field(min_length=1, max_length=200)
 	invitation_token: str | None = None
+	demo_workspace: bool = False
 
 	@field_validator("name")
 	@classmethod
@@ -78,7 +79,7 @@ def _account_response(db: Session, account: Account) -> dict:
 		"phone": account.phone,
 		"patient_id": account.patient_id,
 		"caregiver_id": account.caregiver_id,
-		"patient": {"id": patient.id, "name": patient.name, "current_phase": patient.current_phase, "owner_caregiver_id": db.scalar(select(Account.caregiver_id).where(Account.patient_id == patient.id, Account.role == "patient").order_by(Account.id).limit(1))} if patient else None,
+		"patient": {"id": patient.id, "name": patient.name, "current_phase": patient.current_phase, "is_demo_workspace": patient.is_demo_workspace, "owner_caregiver_id": db.scalar(select(Account.caregiver_id).where(Account.patient_id == patient.id, Account.role == "patient").order_by(Account.id).limit(1))} if patient else None,
 		"caregiver": {
 			"id": caregiver.id,
 			"name": caregiver.name,
@@ -115,10 +116,15 @@ def me(request: Request, db: Session = Depends(get_db)) -> dict:
 @router.post("/bootstrap", status_code=status.HTTP_201_CREATED)
 def bootstrap(payload: BootstrapRequest, request: Request, db: Session = Depends(get_db)) -> dict:
 	auth_account = require_current_account(request)
-	if auth_account.id and auth_account.role != "unlinked":
-		return _account_response(db, auth_account)
-	existing_account = db.scalar(select(Account).where(Account.subject == auth_account.subject))
+	if payload.demo_workspace and payload.role != "patient":
+		raise HTTPException(400, "A fictional workspace must be created by its owner")
+	if payload.demo_workspace and not demo_mode_enabled():
+		raise HTTPException(404, "Fictional demonstration workspaces are not available")
+	existing_account = auth_account if auth_account.id and auth_account.role != "unlinked" else db.scalar(select(Account).where(Account.subject == auth_account.subject))
 	if existing_account is not None:
+		patient = db.get(Patient, existing_account.patient_id) if existing_account.patient_id else None
+		if payload.demo_workspace and (existing_account.role != "patient" or not patient or not patient.is_demo_workspace):
+			raise HTTPException(409, "An existing care workspace cannot be converted. Use a separate account for a fictional demonstration.")
 		return _account_response(db, existing_account)
 	if payload.role == "caregiver":
 		if not payload.invitation_token:
@@ -148,9 +154,9 @@ def bootstrap(payload: BootstrapRequest, request: Request, db: Session = Depends
 		patient = db.scalar(select(Patient).where(
 			Patient.email == auth_account.email,
 			~Patient.id.in_(select(Account.patient_id).where(Account.role == "patient", Account.patient_id.is_not(None))),
-		)) if auth_account.email else None
+		)) if auth_account.email and not payload.demo_workspace else None
 		if patient is None:
-			patient = Patient(name=payload.name, email=auth_account.email, current_phase="Onboarding")
+			patient = Patient(name=payload.name, email=auth_account.email, current_phase="Onboarding", is_demo_workspace=payload.demo_workspace)
 			db.add(patient)
 			db.flush()
 		else:
@@ -174,6 +180,8 @@ def bootstrap(payload: BootstrapRequest, request: Request, db: Session = Depends
 	db.add(account)
 	if payload.role == "caregiver":
 		record_audit(db, patient_id=patient.id, actor_name=account.name, action="invitation_accepted", resource_type="Caregiver", resource_id=caregiver.id)
+	elif payload.demo_workspace:
+		record_audit(db, patient_id=patient.id, actor_name=account.name, action="demo_workspace_created", resource_type="Patient", resource_id=patient.id)
 	try:
 		db.commit()
 	except IntegrityError:
@@ -270,7 +278,7 @@ def invitation_delivery(request: Request, db: Session = Depends(get_db)):
 	if not account.patient_id or not account.caregiver_id:
 		raise HTTPException(403, "Complete your care workspace setup first")
 	require_patient_controller(db, account.caregiver_id, account.patient_id)
-	return {**delivery_capability(), "simulated_available": demo_caregivers_available(account.patient_id)}
+	return {**delivery_capability(), "simulated_available": demo_caregivers_available(account.patient_id, db)}
 
 
 @router.get("/invitations")

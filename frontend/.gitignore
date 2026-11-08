@@ -43,3 +43,6 @@ next-env.d.ts
 
 # Isolated browser QA builds
 /.next-qa/
+/.next-browser-tests/
+/.browser-test-results/
+/playwright-report/

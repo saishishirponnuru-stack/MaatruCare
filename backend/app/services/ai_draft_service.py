@@ -1,9 +1,14 @@
 import json
+import unicodedata
 from fastapi import HTTPException
 from sqlalchemy import select
-from ..models import AIDraft, Task, CareHandoff
+from ..models import AIDraft, Task, CareHandoff, Patient
 from .auth_service import get_current_account
 from .audit_service import record_audit
+
+
+def normalized_task_title(title):
+    return " ".join(unicodedata.normalize("NFKC", title).casefold().split())
 
 
 def own_draft(db, draft_id, patient_id=None):
@@ -20,11 +25,22 @@ def validate_task_approval(db, payload):
         raise HTTPException(403, "Review and approve this suggestion before creating a task")
     suggestions = json.loads(draft.output_json).get("suggestions", [])
     index = payload.ai_suggestion_index
-    if index is None or index >= len(suggestions) or draft.operation not in {"extract_tasks", "appointment_prep", "summarize"}:
+    if index is None or index >= len(suggestions) or draft.operation not in {"extract_tasks", "appointment_prep", "summarize", "care_plan"}:
         raise HTTPException(422, "Choose a task suggestion from this draft")
     if draft.status == "Rejected" or json.loads(draft.review_json).get(str(index), {}).get("action") == "reject":
         raise HTTPException(409, "This suggestion was rejected")
-    return db.scalar(select(Task).where(Task.ai_draft_id == draft.id, Task.ai_suggestion_index == index))
+    existing = db.scalar(select(Task).where(Task.ai_draft_id == draft.id, Task.ai_suggestion_index == index))
+    if existing is not None:
+        return existing
+    if draft.operation == "care_plan":
+        # Serialize approvals for this workspace on PostgreSQL, including
+        # proposals from different drafts. Existing per-suggestion uniqueness
+        # still protects repeated submissions of the same draft.
+        db.scalar(select(Patient.id).where(Patient.id == payload.patient_id).with_for_update())
+        titles = db.scalars(select(Task.title).where(Task.patient_id == payload.patient_id, Task.status != "Completed")).all()
+        if any(normalized_task_title(title) == normalized_task_title(payload.title) for title in titles):
+            raise HTTPException(409, "An open task with this title already exists. Review it in Tasks or give this responsibility a distinct title.")
+    return None
 
 
 def record_task_approval(db, payload, task, actor_name):

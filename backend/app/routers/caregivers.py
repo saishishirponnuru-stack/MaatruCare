@@ -63,7 +63,7 @@ def list_caregivers(
 @router.post("/demo", response_model=CaregiverResponse, status_code=status.HTTP_201_CREATED)
 def create_demo_caregiver(payload: DemoCaregiverCreate, db: Session = Depends(get_db)) -> Caregiver:
 	actor = require_patient_controller(db, payload.actor_caregiver_id, payload.patient_id)
-	if not demo_caregivers_available(actor.patient_id):
+	if not demo_caregivers_available(actor.patient_id, db):
 		raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Simulated caregivers are unavailable here")
 	name = payload.name.strip()
 	relationship = payload.relationship.strip()

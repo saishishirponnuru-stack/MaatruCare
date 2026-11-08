@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useRef, useState, type FormEvent } from "react";
-import { ArrowRight, Check, Plus } from "lucide-react";
+import CoordinationStory from "@/components/handoffs/CoordinationStory";
+import { ArrowRight, Plus } from "lucide-react";
 import AppShell from "@/components/layout/AppShell";
 import { Badge, Button, Drawer, Field, Message, PageHeading, Panel, Stat } from "@/components/ui/ProductUI";
 import { useMaatruCareDemo, type DemoHandoff } from "@/context/MaatruCareDemoContext";
@@ -70,12 +71,7 @@ export default function HandoffsPage() {
       <p className="mb-5 whitespace-pre-line text-sm leading-7">{selected.reason}</p>
       <div className="mb-6 flex flex-wrap items-center gap-4 rounded-xl bg-[var(--mc-surface-muted)] p-4"><div><p className="mc-caption">From</p><p className="font-semibold">{selected.from}</p>{selected.fromDemo && <Badge>Simulated</Badge>}</div><ArrowRight size={18} aria-hidden="true" className="text-[var(--mc-muted)]" /><div><p className="mc-caption">To</p><p className="font-semibold">{selected.to}</p>{selected.toDemo && <Badge>Simulated</Badge>}</div></div>
       {selected.context && <div className="mb-5"><h3 className="text-sm font-semibold">Context</h3><p className="mc-caption mt-2 whitespace-pre-line">{selected.context}</p></div>}
-      {selected.relatedTaskId && <p className="mc-caption mb-5">Related task: <Link href="/tasks" className="underline">{tasks.find((item) => Number(item.id) === selected.relatedTaskId)?.title ?? "View task"}</Link></p>}
-      <ol className="grid grid-cols-2 gap-5 border-y border-[var(--mc-border)] py-6 sm:grid-cols-4" aria-label="Handoff progress">{stages.map((stage,index) => {
-        const position = stages.indexOf(selected.stage); const done = index < position || selected.stage === "Completed";
-        const timestamp = [selected.createdAt,selected.sentAt,selected.acknowledgedAt,selected.completedAt][index];
-        return <li key={stage} aria-current={!removed(selected) && index === position ? "step" : undefined}><span className={`mb-2 flex h-8 w-8 items-center justify-center rounded-full border text-sm ${done || removed(selected) && timestamp ? "border-[var(--mc-success)] text-[var(--mc-success)]" : index === position && !removed(selected) ? "border-[var(--mc-brand)] text-[var(--mc-brand)]" : "border-[var(--mc-border)] text-[var(--mc-muted)]"}`}>{done || removed(selected) && timestamp ? <Check size={16} /> : index + 1}</span><p className="text-sm font-semibold">{stage}</p>{timestamp && <time className="mc-caption mt-1 block">{displayTimestamp(timestamp)}</time>}</li>;
-      })}</ol>
+      <CoordinationStory key={selected.id} handoff={selected} />
       {removed(selected) ? <p className="mc-caption mt-5">{selected.archivedAt ? "Archived" : "Cancelled"} {displayTimestamp(selected.archivedAt ?? selected.cancelledAt)}. History is retained.</p> : <div className="mt-6">
         <div className="flex flex-wrap items-center gap-3">{selected.stage === "Prepared" && canSend && <Button disabled={busy} onClick={() => void run(() => sendHandoff(selected.id), "Handoff sent")}>Send handoff</Button>}{selected.stage === "Sent" && canRespond && <Button disabled={busy} onClick={() => void run(() => acknowledgeHandoff(selected.id), simulation ? "Simulated acknowledgement recorded" : "Handoff acknowledged")}>{simulation ? "Acknowledge (simulation)" : "Acknowledge"}</Button>}{selected.stage === "Acknowledged" && canRespond && <Button disabled={busy} onClick={() => void run(() => completeHandoff(selected.id), simulation ? "Simulated completion recorded" : "Handoff completed")}>{simulation ? "Complete (simulation)" : "Complete handoff"}</Button>}{controller && <Button variant="secondary" disabled={busy} onClick={() => setRemoving(selected)}>{selected.stage === "Completed" ? "Archive handoff" : "Cancel handoff"}</Button>}</div>
         {simulation && canRespond && ["Sent","Acknowledged"].includes(selected.stage) && <p className="mc-caption mt-3">Simulated action - no caregiver account is involved.</p>}

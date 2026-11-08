@@ -201,7 +201,7 @@ def configure_email(monkeypatch):
         monkeypatch.setenv(key,value)
 
 
-@pytest.mark.parametrize("provider_status,body,expected", [(202,{"id":"provider-accepted"},"accepted"),(401,{"message":"private provider error"},"failed"),(200,{},"failed"),(200,{"id":None},"failed")])
+@pytest.mark.parametrize("provider_status,body,expected", [(202,{"id":"provider-accepted"},"accepted"),(401,{"message":"private provider error"},"failed"),(429,{"message":"provider rate limit"},"failed"),(503,{"message":"provider unavailable"},"failed"),(200,{},"failed"),(200,{"id":None},"failed")])
 def test_email_provider_confirmation_and_secure_link_fallback(client, patient_workspace, monkeypatch, db_session, provider_status, body, expected):
     configure_email(monkeypatch)
     sent = []

@@ -39,6 +39,7 @@ interface LocalSettings {
 
 interface LocalSettingsContextValue extends LocalSettings {
   hydrated: boolean;
+  storageError: string;
   saveProfile: (profile: DemoProfile) => void;
   updateCarePreference: <K extends keyof CarePreferences>(
     key: K,
@@ -117,35 +118,50 @@ function hydrateSettings(value: unknown): LocalSettings {
 export function LocalSettingsProvider({ children }: { children: ReactNode }) {
   const { account } = useAuth();
   const storageKey = account ? `${STORAGE_KEY}:${account.subject}` : null;
-  const [settings, setSettings] = useState<LocalSettings>(defaults);
-  const [hydrated, setHydrated] = useState(false);
+  // Keep auth callback children mounted, but scope both state and persistence
+  // to the subject that loaded them. A new key must never receive old state.
+  const [snapshot, setSnapshot] = useState<{ storageKey: string | null; settings: LocalSettings; hydrated: boolean }>({ storageKey: null, settings: defaults, hydrated: false });
+  const settings = snapshot.storageKey === storageKey ? snapshot.settings : defaults;
+  const hydrated = snapshot.storageKey === storageKey && snapshot.hydrated;
+  const [storageError, setStorageError] = useState("");
 
   useEffect(() => {
+    let next = defaults;
+    let error = "";
     try {
       const stored = storageKey ? window.localStorage.getItem(storageKey) : null;
       if (stored) {
-        // Browser-only settings are hydrated after mount to keep server markup stable.
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setSettings(hydrateSettings(JSON.parse(stored)));
+        next = hydrateSettings(JSON.parse(stored));
       }
     } catch {
-      // Keep the synthetic defaults if browser storage is unavailable or malformed.
+      error = "Saved browser preferences could not be read. Default preferences apply for this visit.";
     }
-    setHydrated(true);
+    // Browser-only state is loaded after mount, without exposing another subject.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSnapshot({ storageKey, settings: next, hydrated: true });
+    setStorageError(error);
   }, [storageKey]);
 
   useEffect(() => {
     if (!hydrated || !storageKey) return;
+    let error = "";
     try {
       window.localStorage.setItem(storageKey, JSON.stringify(settings));
     } catch {
-      // Controls remain usable in memory for this session when storage is unavailable.
+      error = "Browser preferences could not be saved. Changes apply for this visit.";
     }
+    const timer = window.setTimeout(() => setStorageError(error), 0);
+    return () => window.clearTimeout(timer);
   }, [hydrated, settings, storageKey]);
+
+  const setSettings = useCallback((change: (current: LocalSettings) => LocalSettings) => {
+    setSnapshot(current => current.storageKey === storageKey && current.hydrated
+      ? { ...current, settings: change(current.settings) } : current);
+  }, [storageKey]);
 
   const saveProfile = useCallback((profile: DemoProfile) => {
     setSettings((current) => ({ ...current, profile }));
-  }, []);
+  }, [setSettings]);
 
   const updateCarePreference = useCallback(
     <K extends keyof CarePreferences>(key: K, value: CarePreferences[K]) => {
@@ -154,7 +170,7 @@ export function LocalSettingsProvider({ children }: { children: ReactNode }) {
         carePreferences: { ...current.carePreferences, [key]: value },
       }));
     },
-    [],
+    [setSettings],
   );
 
   const toggleNotification = useCallback((key: keyof NotificationPreferences) => {
@@ -162,11 +178,11 @@ export function LocalSettingsProvider({ children }: { children: ReactNode }) {
       ...current,
       notifications: { ...current.notifications, [key]: !current.notifications[key] },
     }));
-  }, []);
+  }, [setSettings]);
 
   return (
     <LocalSettingsContext.Provider
-      value={{ ...settings, hydrated, saveProfile, updateCarePreference, toggleNotification }}
+      value={{ ...settings, hydrated, storageError, saveProfile, updateCarePreference, toggleNotification }}
     >
       {children}
     </LocalSettingsContext.Provider>

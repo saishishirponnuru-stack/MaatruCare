@@ -1,6 +1,6 @@
 "use client";
 
-import { cloneElement, isValidElement, useEffect, useId, useRef, type ButtonHTMLAttributes, type ReactNode } from "react";
+import { cloneElement, isValidElement, useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { X } from "lucide-react";
 
 export function Button({ variant = "primary", className = "", children, ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" | "danger" }) {
@@ -35,13 +35,24 @@ export function Stat({ label, value, detail }: { label: string; value: ReactNode
 export function Drawer({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   const headingId = useId();
   const ref = useRef<HTMLDialogElement>(null);
+  // Capture the opener before React's input autofocus runs during commit.
+  const [returnFocus] = useState(() => typeof document === "undefined" ? null : document.activeElement as HTMLElement | null);
   useEffect(() => {
     const dialog = ref.current;
-    const previous = document.activeElement as HTMLElement | null;
     dialog?.showModal();
-    return () => { dialog?.close(); previous?.focus(); };
-  }, []);
-  return <dialog ref={ref} aria-labelledby={headingId} onCancel={(event) => { event.preventDefault(); onClose(); }} onClick={(event) => { if (event.target === event.currentTarget) onClose(); }} className="mc-drawer"><div className="flex h-full flex-col" onClick={(event) => event.stopPropagation()}><header className="flex items-center justify-between gap-4 border-b border-[var(--mc-border)] p-6"><h2 id={headingId} className="text-xl font-semibold">{title}</h2><button type="button" onClick={onClose} aria-label="Close panel" className="mc-icon-button"><X size={19} /></button></header><div className="min-h-0 flex-1 overflow-y-auto p-6">{children}</div></div></dialog>;
+    dialog?.querySelector<HTMLElement>('input:not([type="hidden"]):not([disabled]), textarea:not([disabled]), select:not([disabled])')?.focus();
+    return () => { dialog?.close(); if (returnFocus?.isConnected) returnFocus.focus(); };
+  }, [returnFocus]);
+  return <dialog ref={ref} aria-labelledby={headingId} onKeyDown={(event) => {
+    if (event.key !== "Tab") return;
+    const controls = [...event.currentTarget.querySelectorAll<HTMLElement>('a[href], button, input:not([type="hidden"]), textarea, select, [tabindex]')]
+      .filter(element => element.tabIndex >= 0 && !element.matches(":disabled") && element.getClientRects().length > 0);
+    const target = event.shiftKey ? controls.at(-1) : controls[0];
+    const boundary = event.shiftKey ? controls[0] : controls.at(-1);
+    if (target && (document.activeElement === boundary || !event.currentTarget.contains(document.activeElement))) {
+      event.preventDefault(); target.focus();
+    }
+  }} onCancel={(event) => { event.preventDefault(); onClose(); }} onClick={(event) => { if (event.target === event.currentTarget) onClose(); }} className="mc-drawer"><div className="flex h-full flex-col" onClick={(event) => event.stopPropagation()}><header className="flex items-center justify-between gap-4 border-b border-[var(--mc-border)] p-6"><h2 id={headingId} className="text-xl font-semibold">{title}</h2><button type="button" onClick={onClose} aria-label="Close panel" className="mc-icon-button"><X size={19} /></button></header><div className="min-h-0 flex-1 overflow-y-auto p-6">{children}</div></div></dialog>;
 }
 
 export function PageHeading({ title, description, action }: { title: string; description: string; action?: ReactNode }) {

@@ -119,6 +119,7 @@ def generate_coordination_summary(note: str) -> dict:
 
 
 WORKSPACE_INSTRUCTIONS = {
+    "care_plan": "Propose a short, practical non-clinical coordination plan from the reviewed note. Separate existing responsibilities from new suggested actions. Do not propose tasks explicitly described as already recorded. Explain suggested actions in the summary, quote their basis exactly, and label optional steps Suggestion. Never invent appointments, requirements, assignees or dates. Exact YYYY-MM-DD dates may be used; otherwise ask for clarification. No diagnoses, treatment or clinical plans.",
     "summarize": "Summarize logistics; extract dates, times, people and explicitly supported responsibilities. List ambiguities without resolving them.",
     "extract_tasks": "Extract actionable coordination responsibilities into editable task suggestions. A due_date is allowed only when an exact YYYY-MM-DD date appears in the source. Preserve ambiguous days in missing_information.",
     "appointment_prep": "Prepare a non-clinical appointment checklist. Distinguish explicit instructions ('From note') from optional general logistical suggestions ('Suggestion'). Do not invent clinic requirements.",

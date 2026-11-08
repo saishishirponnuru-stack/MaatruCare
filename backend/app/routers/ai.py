@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from ..database import get_db
-from ..models import AIDraft
+from ..models import AIDraft, Task
 from ..ai_schemas import WorkspaceRequest, WorkspaceOutput, DraftReview
 from ..services.ai_service import generate_workspace
 from ..services.ai_draft_service import own_draft
@@ -128,7 +128,7 @@ def coordination_summary(payload: CoordinationRequest, request: Request):
 
 _workspace_executor = ThreadPoolExecutor(max_workers=2)
 _workspace_capacity = threading.BoundedSemaphore(2)
-OPERATION_PERMISSION = {"extract_tasks": "Coordination tasks", "appointment_prep": "Appointments", "handoff_draft": "Care handoffs", "update_draft": "Approved care updates", "nutrition_notes": "Lifestyle records"}
+OPERATION_PERMISSION = {"extract_tasks": "Coordination tasks", "care_plan": "Coordination tasks", "appointment_prep": "Appointments", "handoff_draft": "Care handoffs", "update_draft": "Approved care updates", "nutrition_notes": "Lifestyle records"}
 ADDITIONAL_CLINICAL = re.compile(r"\b(?:prescribe|supplements?|vitamins?|insulin|metformin|seizures?|emergency|triage|severe pain)\b|दवा|इलाज|निदान|రక్తస్రావం|మందులు|చికిత్స", re.IGNORECASE)
 
 
@@ -194,6 +194,19 @@ def workspace(payload: WorkspaceRequest, request: Request, db: Session = Depends
     except Exception:
         logger.warning("AI workspace generation failed")
         raise HTTPException(503, "AI is temporarily unavailable. Your care records are unchanged.") from None
+    if payload.operation == "care_plan":
+        # Compare locally; existing record titles are never sent to the model.
+        from ..services.ai_draft_service import normalized_task_title
+        existing_titles = {normalized_task_title(title) for title in db.scalars(select(Task.title).where(Task.patient_id == account.patient_id, Task.status != "Completed")).all()}
+        distinct = []
+        for suggestion in output.suggestions:
+            key = normalized_task_title(suggestion.title)
+            if key not in existing_titles:
+                distinct.append(suggestion)
+                existing_titles.add(key)
+        if len(distinct) != len(output.suggestions):
+            output.missing_information = [*output.missing_information[:7], "Repeated proposals and tasks already open in your workspace were omitted. Review Tasks for existing responsibilities."]
+        output.suggestions = distinct
     draft = AIDraft(patient_id=account.patient_id, account_id=account.id, operation=payload.operation, source_hash=hashlib.sha256(payload.note.encode()).hexdigest(), output_json=output.model_dump_json(), status="Ready")
     db.add(draft)
     db.flush()

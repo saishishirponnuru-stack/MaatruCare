@@ -1,0 +1,35 @@
+{
+  "timestamp_utc": "2026-11-07T20:28:32.586970+00:00",
+  "read_only": true,
+  "methodology": "External TLS connection from local machine; fixed read-only ID queries, not full application endpoints. No migrations or application imports.",
+  "connect_ms": 2022.55,
+  "select_1_samples": 20,
+  "select_1_p50_ms": 267.89,
+  "select_1_p95_ms": 341.19,
+  "plans": {
+    "caregivers": {
+      "planning_ms": 0.504,
+      "execution_ms": 0.086,
+      "returned_rows": 2.0,
+      "plan": "Limit"
+    },
+    "tasks": {
+      "planning_ms": 0.232,
+      "execution_ms": 0.033,
+      "returned_rows": 0.0,
+      "plan": "Limit"
+    },
+    "care_handoffs": {
+      "planning_ms": 0.213,
+      "execution_ms": 0.027,
+      "returned_rows": 0.0,
+      "plan": "Limit"
+    },
+    "timeline_events": {
+      "planning_ms": 0.221,
+      "execution_ms": 0.053,
+      "returned_rows": 12.0,
+      "plan": "Limit"
+    }
+  }
+}

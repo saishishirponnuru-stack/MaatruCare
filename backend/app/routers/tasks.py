@@ -2,7 +2,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from ..database import get_db
 from ..models import Task
@@ -21,7 +21,7 @@ def list_tasks(
 	actor = get_active_caregiver(db, actor_caregiver_id)
 	require_permission(db, actor, "Coordination tasks")
 	return list(
-		db.scalars(select(Task).where(Task.patient_id == actor.patient_id).order_by(Task.due_date, Task.id)).all()
+		db.scalars(select(Task).options(joinedload(Task.owner)).where(Task.patient_id == actor.patient_id).order_by(Task.due_date, Task.id)).all()
 	)
 
 

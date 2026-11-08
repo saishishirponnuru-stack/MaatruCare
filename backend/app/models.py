@@ -1,6 +1,6 @@
 from datetime import date, datetime, time
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text, Time
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text, Time, false
 from sqlalchemy.orm import Mapped, mapped_column, relationship as orm_relationship
 
 from .database import Base
@@ -46,6 +46,8 @@ class Patient(Base):
 	email: Mapped[str | None] = mapped_column(String(255))
 	phone: Mapped[str | None] = mapped_column(String(50))
 	current_phase: Mapped[str] = mapped_column(String(100), nullable=False)
+	# Chosen only when a new owner creates a fictional workspace during onboarding.
+	is_demo_workspace: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false(), nullable=False)
 	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
 	caregivers: Mapped[list["Caregiver"]] = orm_relationship(back_populates="patient", cascade="all, delete-orphan")

@@ -9,7 +9,7 @@ export type ApiAuthAccount = {
   name: string;
   patient_id: number | null;
   caregiver_id: number | null;
-  patient?: { id: number; name: string; current_phase: string; owner_caregiver_id?: number | null } | null;
+  patient?: { id: number; name: string; current_phase: string; is_demo_workspace?: boolean; owner_caregiver_id?: number | null } | null;
   caregiver?: { id: number; name: string; relationship: string; role: string; is_demo: boolean; access_status: string } | null;
 };
 
@@ -25,7 +25,7 @@ export type ApiCoordinationSummary = {
   requires_human_review: boolean;
 };
 
-export type AIOperation = "summarize" | "extract_tasks" | "appointment_prep" | "handoff_draft" | "update_draft" | "nutrition_notes";
+export type AIOperation = "summarize" | "extract_tasks" | "appointment_prep" | "handoff_draft" | "update_draft" | "nutrition_notes" | "care_plan";
 export type AIDraft = { id: number; operation: AIOperation; status: "Ready" | "Approved" | "Rejected"; created_at: string; review: Record<string, { action?: string; task_id?: number }>; output: { summary: string; facts: Array<{ text: string; source_quote: string }>; dates: string[]; times: string[]; people: string[]; responsibilities: Array<{ text: string; source_quote: string }>; missing_information: string[]; suggestions: Array<{ title: string; kind: string; source_quote: string; assignee_name: string | null; due_date: string | null }>; handoff_title: string | null; handoff_summary: string | null; care_update: string | null } };
 export type CoordinationFacts = { source: string; available_categories: string[]; tasks: Array<{ id: number; title: string; owner: string; simulated: boolean; due_date: string; status: string }>; handoffs: Array<{ id: number; title: string; recipient: string; simulated: boolean; status: string }>; appointments: Array<{ id: number; title: string; date: string; time: string; location: string }> };
 export type CoordinationAnalytics = { start: string; end: string; tasks: { simulated_tasks: number; eligible: number; completed: number; pending: number; overdue: number } | null; handoffs: { sent: number; acknowledged: number; simulated_acknowledgements: number; average_acknowledgement_minutes: number | null; qualifying_real_acknowledgements: number } | null; caregivers: { accepted: number; simulated: number } };
@@ -306,7 +306,7 @@ export const api = {
   getAuthMe: () => request<ApiAuthAccount>("/api/auth/me"),
   updateProfile: (payload: { name: string; phone?: string; current_phase?: string }) =>
     request<ApiAuthAccount>("/api/auth/profile", { method: "PUT", body: JSON.stringify(payload) }),
-  bootstrapAccount: (payload: { name: string; role: "patient" | "caregiver"; invitation_token?: string }) =>
+  bootstrapAccount: (payload: { name: string; role: "patient" | "caregiver"; invitation_token?: string; demo_workspace?: boolean }) =>
     request<ApiAuthAccount>("/api/auth/bootstrap", { method: "POST", body: JSON.stringify(payload) }),
   createCaregiverInvitation: (payload: { email: string; name?: string; relationship?: string; delivery?: "link" | "email" }) =>
     request<{ token: string; email: string; email_status: ApiCaregiverInvitation["email_status"]; email_accepted_at: string | null }>("/api/auth/invitations", { method: "POST", body: JSON.stringify(payload) }),
@@ -330,7 +330,7 @@ export const api = {
   getTasks: (identity: ApiIdentity) => request<ApiTask[]>(`/api/tasks?actor_caregiver_id=${identity.caregiverId}`),
   getAppointments: (identity: ApiIdentity) => request<ApiAppointment[]>(`/api/appointments?actor_caregiver_id=${identity.caregiverId}`),
   getHandoffs: (identity: ApiIdentity) => request<ApiHandoff[]>(`/api/handoffs?actor_caregiver_id=${identity.caregiverId}&include_archived=true`),
-  getTimeline: (identity: ApiIdentity, limit = 15, offset = 0, options: { order: "newest" | "oldest"; category: string } = { order: "newest", category: "All" }) => request<ApiTimelineEvent[]>(`/api/timeline?actor_caregiver_id=${identity.caregiverId}&limit=${limit}&offset=${offset}&order=${options.order}&category=${encodeURIComponent(options.category)}`),
+  getTimeline: (identity: ApiIdentity, limit = 15, offset = 0, options: { order: "newest" | "oldest"; category: string; resourceType?: "Task" | "CareHandoff"; resourceId?: number } = { order: "newest", category: "All" }) => request<ApiTimelineEvent[]>(`/api/timeline?actor_caregiver_id=${identity.caregiverId}&limit=${limit}&offset=${offset}&order=${options.order}&category=${encodeURIComponent(options.category)}${options.resourceType ? `&resource_type=${options.resourceType}` : ""}${options.resourceId ? `&resource_id=${options.resourceId}` : ""}`),
   createTask: (payload: ApiTaskCreate) => request<ApiTask>("/api/tasks", { method: "POST", body: JSON.stringify(payload) }),
   updateTask: (id: number, payload: ApiTaskUpdate) => request<ApiTask>(`/api/tasks/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
   completeTask: (id: number, completed: boolean, identity: ApiIdentity) => request<ApiTask>(`/api/tasks/${id}/complete`, { method: "POST", body: JSON.stringify({ actor_caregiver_id: identity.caregiverId, completed }) }),

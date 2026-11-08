@@ -19,6 +19,8 @@ def list_timeline_events(
 	offset: int = Query(0, ge=0),
 	order: Literal["newest", "oldest"] = "newest",
 	category: Literal["All", "Tasks", "Handoffs", "Care Circle", "Sharing changes", "Appointments"] = "All",
+	resource_type: Literal["Task", "CareHandoff"] | None = None,
+	resource_id: int | None = Query(None, ge=1),
 	db: Session = Depends(get_db),
 ) -> list[TimelineEvent]:
 	actor = get_active_caregiver(db, actor_caregiver_id)
@@ -45,5 +47,9 @@ def list_timeline_events(
 		query = query.where(or_(TimelineEvent.resource_type.is_(None), TimelineEvent.resource_type.not_in(["Caregiver", "CaregiverInvitation", "Permission"])))
 	if category != "All":
 		query = query.where(category_filters[category])
+	if resource_type is not None:
+		query = query.where(TimelineEvent.resource_type == resource_type)
+	if resource_id is not None:
+		query = query.where(TimelineEvent.resource_id == resource_id)
 	ordering = (TimelineEvent.created_at.asc(), TimelineEvent.id.asc()) if order == "oldest" else (TimelineEvent.created_at.desc(), TimelineEvent.id.desc())
 	return list(db.scalars(query.order_by(*ordering).offset(offset).limit(limit)).all())

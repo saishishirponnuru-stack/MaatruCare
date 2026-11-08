@@ -74,7 +74,7 @@ export default function SettingsPage() {
     }, 0);
     return () => { active = false; window.clearTimeout(timer); };
   }, [account?.patient_id, account?.caregiver_id, resetPreferences]);
-  const { profile, carePreferences, notifications, updateCarePreference, toggleNotification } = useLocalSettings();
+  const { carePreferences, notifications, updateCarePreference, toggleNotification, storageError: localStorageError } = useLocalSettings();
   const {
     theme,
     toggleTheme,
@@ -84,6 +84,7 @@ export default function SettingsPage() {
     setHighContrast,
     reducedMotion,
     setReducedMotion,
+    storageError: appearanceStorageError,
   } = usePreferences();
 
   function setCarePreference(key: CarePreferenceKey, value: string) {
@@ -118,9 +119,10 @@ export default function SettingsPage() {
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9A9196]">Preferences</p>
           <h1 className="mt-2 text-3xl font-semibold tracking-[-0.03em] text-[#211C1F]">Settings</h1>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-[#756D72]">Choose how MaatruCare appears in this browser. Backend access remains protected.</p>
+          <p className="mt-2 max-w-xl text-sm leading-6 text-[#756D72]">Choose your appearance and preferences for this browser.</p>
         </div>
 
+        {(localStorageError || appearanceStorageError) && <p role="alert" className="mc-message mc-message--error">{localStorageError || appearanceStorageError}</p>}
         <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(340px,0.8fr)]">
           <div className="space-y-6">
             <SettingsSection reducedMotion={reducedMotion} eyebrow="Authenticated account" title="Account information" iconTone="violet" icon={<UserRound size={17} />}>
@@ -136,7 +138,7 @@ export default function SettingsPage() {
               </div>
               <div className="mt-6 grid gap-3 sm:grid-cols-3">
                 <InfoItem icon={<Mail size={15} />} label="Sign-in email" value={email || "Not available"} />
-                <InfoItem icon={<Phone size={15} />} label="Phone" value={profile.phone.trim() && profile.phone !== "+91 90000 00001" ? profile.phone : "Not provided"} />
+                <InfoItem icon={<Phone size={15} />} label="Phone" value={account?.phone?.trim() || "Not provided"} />
                 <InfoItem icon={<Globe2 size={15} />} label="Preferred language" value={carePreferences.preferredLanguage} />
               </div>
               <p className="mt-4 rounded-[12px] bg-[#FBF8F7] p-3 text-[11px] leading-5 text-[#756D72]">Account name is persisted by MaatruCare; sign-in email comes from your authenticated session. Phone and display preferences stay in this browser for your account. Use fictional information for demonstrations.</p>

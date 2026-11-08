@@ -1,0 +1,88 @@
+import {test, expect} from "./fixtures";
+import {createOwner, installSession, open} from "./helpers";
+
+test("all five lifestyle trackers save, correct records and survive refresh", async ({page}) => {
+  const {session, account} = await createOwner(page, "Lifestyle Fictional Owner");
+  await installSession(page, session);
+  await open(page, "/lifestyle");
+  await expect(page.getByRole("button", {name: "Log intake", exact: true})).toBeEnabled();
+  await page.getByLabel("Personal daily goal (mL)").fill("2000");
+  await page.getByRole("button", {name: "Save goal", exact: true}).click();
+  await expect(page.getByRole("status").filter({hasText: "Hydration goal saved"})).toBeVisible();
+  await page.getByLabel("Amount (mL)").fill("500");
+  await page.getByRole("button", {name: "Log intake", exact: true}).click();
+  await expect(page.getByRole("status").filter({hasText: "Water entry saved"})).toBeVisible();
+  const waterHistory = page.locator("section").filter({has: page.getByRole("heading", {name: "Water history", exact: true})});
+  await waterHistory.getByRole("button", {name: "Edit", exact: true}).click();
+  await page.getByLabel("Amount (mL)").fill("750");
+  await page.getByRole("button", {name: "Save correction", exact: true}).click();
+  await expect(waterHistory).toContainText("750 mL");
+
+  await page.getByRole("button", {name: "Sleep", exact: true}).click();
+  await page.getByLabel("Bedtime", {exact: true}).fill("23:00");
+  await page.getByLabel("Wake-up time").fill("07:00");
+  await page.getByLabel("Subjective quality (optional)").selectOption("Fair");
+  await page.getByLabel("Interruptions (optional)").fill("1");
+  await page.getByRole("button", {name: "Save sleep session", exact: true}).click();
+  await expect(page.getByRole("status").filter({hasText: "Sleep session recorded"})).toBeVisible();
+
+  await page.getByRole("button", {name: "Weight", exact: true}).click();
+  await page.getByLabel("Weight (kg)").fill("68.5");
+  await page.getByRole("button", {name: "Save measurement", exact: true}).click();
+  await expect(page.getByRole("status").filter({hasText: "Measurement saved"})).toBeVisible();
+  await page.getByLabel("Weight (kg)").fill("68.7");
+  await page.getByRole("button", {name: "Save measurement", exact: true}).click();
+  await expect(page.getByRole("status").filter({hasText: "Measurement saved"})).toBeVisible();
+
+  await page.getByRole("button", {name: "Activity", exact: true}).click();
+  await page.getByRole("button", {name: "Create routine", exact: true}).click();
+  const routineDrawer = page.getByRole("dialog");
+  await routineDrawer.getByLabel("Routine name").fill("Fictional evening stroll");
+  await routineDrawer.getByLabel("Planned minutes (optional)").fill("30");
+  await routineDrawer.getByRole("button", {name: "Save routine", exact: true}).click();
+  await expect(routineDrawer).not.toBeVisible();
+  await page.getByLabel("Your completion status").selectOption("Partially completed");
+  await page.getByLabel("Actual minutes (optional)").fill("25");
+  await page.getByLabel("Explanation (optional)").fill("Fictional rain interruption");
+  await page.getByRole("button", {name: "Save check-in", exact: true}).click();
+  await expect(page.getByRole("button", {name: "Update check-in", exact: true})).toBeVisible();
+  await page.getByLabel("Your completion status").selectOption("Completed");
+  await page.getByLabel("Actual minutes (optional)").fill("30");
+  await page.getByRole("button", {name: "Update check-in", exact: true}).click();
+  await expect(page.getByRole("status").filter({hasText: "Activity recorded"})).toBeVisible();
+
+  await page.getByRole("button", {name: "Nutrition", exact: true}).click();
+  await page.getByRole("button", {name: "Add personal goal", exact: true}).click();
+  const goalDrawer = page.getByRole("dialog");
+  await goalDrawer.getByLabel("Goal title").fill("Fictional meal notes");
+  await goalDrawer.getByLabel("Your goal details").fill("Keep a personal meal note each day.");
+  await goalDrawer.getByRole("button", {name: "Save personal goal", exact: true}).click();
+  await expect(goalDrawer).not.toBeVisible();
+  await page.getByLabel("Meal category").selectOption("Lunch");
+  await page.getByLabel("Personal goal (optional)").selectOption({index: 1});
+  await page.getByLabel("Goal adherence (optional)").selectOption({index: 1});
+  await page.getByLabel("Notes (optional)").fill("Fictional lunch log");
+  await page.getByRole("button", {name: "Save meal", exact: true}).click();
+  await expect(page.getByRole("status").filter({hasText: "Meal recorded"})).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("button", {name: "Log intake", exact: true})).toBeEnabled();
+  await expect(page.getByLabel("Personal daily goal (mL)")).toHaveValue("2000");
+
+  const dataResponse = await page.request.get(`http://127.0.0.1:18010/api/lifestyle?patient_id=${account.patient_id}&actor_caregiver_id=${account.caregiver_id}`, {headers: {Authorization: `Bearer ${session.access_token}`}});
+  expect(dataResponse.ok()).toBeTruthy();
+  const saved = await dataResponse.json();
+  expect(saved.water).toHaveLength(1);
+  expect(saved.water[0].quantity_ml).toBe(750);
+  expect(saved.sleep).toHaveLength(1);
+  expect(saved.sleep[0].duration_hours).toBe(8);
+  expect(saved.sleep[0].status).toBe("Fair");
+  expect(saved.weight).toHaveLength(1);
+  expect(saved.weight[0].weight_kg).toBe(68.7);
+  expect(saved.activity_logs).toHaveLength(1);
+  expect(saved.activity_logs[0].actual_minutes).toBe(30);
+  expect(saved.activity_logs[0].completion_status).toBe("Completed");
+  expect(saved.nutrition).toHaveLength(1);
+  expect(saved.nutrition[0].notes).toBe("Fictional lunch log");
+  await page.getByRole("button", {name: "Nutrition", exact: true}).click();
+  await expect(page.getByText("Fictional lunch log", {exact: true})).toBeVisible();
+});

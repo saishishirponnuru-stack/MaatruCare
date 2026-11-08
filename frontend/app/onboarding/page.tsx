@@ -10,7 +10,8 @@ import { api } from "@/lib/api";
 function OnboardingForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { email, suggestedName, refreshAccount } = useAuth();
+  const { account, email, suggestedName, refreshAccount } = useAuth();
+  const [demoWorkspace, setDemoWorkspace] = useState(false);
   const [phase, setPhase] = useState("");
   const [name, setName] = useState(suggestedName);
   const lock=useRef(false);
@@ -28,7 +29,7 @@ function OnboardingForm() {
     lock.current=true;setBusy(true);
     setError("");
     try {
-      await api.bootstrapAccount({ name: name.trim(), role, invitation_token: invitationToken.trim() || undefined });
+      await api.bootstrapAccount({ name: name.trim(), role, invitation_token: invitationToken.trim() || undefined, demo_workspace: role === "patient" && demoWorkspace });
       if (role === "patient" && phase) await api.updateProfile({ name: name.trim(), current_phase: phase });
       await refreshAccount();
       router.replace("/dashboard");
@@ -58,6 +59,10 @@ function OnboardingForm() {
           </div>
         </fieldset>
         {role === "patient" && <label className="mc-field">Current journey phase (optional)<select value={phase} onChange={(event) => setPhase(event.target.value)}><option value="">Choose later</option>{["Preconception", "Pregnancy", "Postnatal", "Early motherhood"].map((value) => <option key={value}>{value}</option>)}</select></label>}
+        {!account && role === "patient" && process.env.NEXT_PUBLIC_DEMO_CAREGIVERS_ENABLED === "true" && <label className="flex cursor-pointer items-start gap-3 rounded-[12px] border border-[var(--mc-border)] p-3 text-xs">
+          <input type="checkbox" checked={demoWorkspace} onChange={event => setDemoWorkspace(event.target.checked)} className="mt-0.5" />
+          <span><span className="block font-semibold">Create a fictional demonstration workspace</span><span className="mt-1 block text-[var(--mc-muted)]">Use made-up information only. Enables simulated caregivers; no sample records are added.</span></span>
+        </label>}
         {role === "caregiver" && <AuthField label="Invitation code" value={invitationToken} onChange={setInvitationToken} autoComplete="one-time-code" />}
         <button type="submit" disabled={busy} className="h-11 w-full rounded-[12px] bg-[var(--mc-brand)] px-4 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-wait disabled:opacity-60">{busy ? "Saving…" : "Continue to MaatruCare"}</button>
         </fieldset>

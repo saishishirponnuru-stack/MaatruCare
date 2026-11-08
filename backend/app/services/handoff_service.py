@@ -2,7 +2,7 @@ from datetime import datetime
 
 from fastapi import HTTPException
 from sqlalchemy import select, update
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from ..models import CareHandoff, Patient, Task
 from .access_service import get_active_caregiver, get_patient_member, is_workspace_owner, require_patient_caregiver, require_patient_controller, require_permission
@@ -160,7 +160,7 @@ def list_handoffs_for_actor(db: Session, actor_caregiver_id: int, patient_id: in
     require_permission(db, actor, "Care handoffs")
     if patient_id is not None and patient_id != actor.patient_id:
         raise HTTPException(403, "This handoff belongs to a different care workspace")
-    query = select(CareHandoff).where(CareHandoff.patient_id == actor.patient_id)
+    query = select(CareHandoff).options(joinedload(CareHandoff.from_caregiver), joinedload(CareHandoff.to_caregiver)).where(CareHandoff.patient_id == actor.patient_id)
     if not include_archived:
         query = query.where(CareHandoff.archived_at.is_(None))
     if not is_workspace_owner(db, actor):

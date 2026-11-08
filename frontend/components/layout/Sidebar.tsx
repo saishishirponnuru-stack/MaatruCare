@@ -57,6 +57,7 @@ export default function Sidebar({
       <div className="flex h-[72px] shrink-0 items-center justify-between px-5 lg:h-[82px] lg:px-7">
         <Link
           href="/dashboard"
+          prefetch={false}
           onClick={handleNavigate}
           className="flex min-w-0 items-center"
         >
@@ -91,7 +92,7 @@ export default function Sidebar({
             const active = isActive(item.href);
 
             return (
-              <Link key={item.href} href={item.href} onClick={handleNavigate} aria-current={active ? "page" : undefined}>
+              <Link key={item.href} href={item.href} prefetch={false} onClick={handleNavigate} aria-current={active ? "page" : undefined}>
                 <motion.div
                   className={`relative flex min-h-11 items-center gap-3 rounded-[12px] px-3 text-[14px] font-medium transition-colors ${
                     item.special ? `mc-ai-nav-item ${active ? "mc-ai-nav-item-active" : ""}` : ""
@@ -118,7 +119,7 @@ export default function Sidebar({
       </nav>
 
       <div className="shrink-0 border-t border-[var(--mc-border)] px-4 py-4">
-        <Link href="/settings" onClick={handleNavigate}>
+        <Link href="/settings" prefetch={false} onClick={handleNavigate}>
           <motion.div
             className={`flex min-h-11 items-center gap-3 rounded-[12px] px-3 text-[14px] font-medium transition-colors ${
               pathname.startsWith("/settings")
