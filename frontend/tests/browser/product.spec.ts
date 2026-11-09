@@ -137,7 +137,7 @@ test("Google login constructs a same-origin callback with PKCE", async ({page}) 
   let destination = "";
   await page.route("http://localhost:18010/auth/v1/authorize?**", route => {
     destination = route.request().url();
-    return route.fulfill({status: 200, contentType: "text/plain", body: "Isolated provider navigation check"});
+    return route.fulfill({status: 204}); // Keep the initiating tab; no provider is contacted.
   });
   await page.goto("/sign-in?next=%2Fcare-circle");
   await page.getByRole("button", {name: /Google/}).click();
@@ -147,7 +147,9 @@ test("Google login constructs a same-origin callback with PKCE", async ({page}) 
   const callback = new URL(url.searchParams.get("redirect_to") || "");
   expect(callback.origin).toBe("http://localhost:3100");
   expect(callback.pathname).toBe("/auth/callback");
-  expect(callback.searchParams.get("next")).toBe("/care-circle");
+  expect(callback.search).toBe("");
+  expect(callback.hash).toBe("");
+  expect(await page.evaluate(()=>JSON.parse(sessionStorage.getItem("maatru-care-google-return:v1")||"{}").next)).toBe("/care-circle");
   expect(url.searchParams.get("code_challenge")).toBeTruthy();
 });
 

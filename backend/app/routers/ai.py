@@ -178,7 +178,17 @@ def workspace(payload: WorkspaceRequest, request: Request, db: Session = Depends
     except FutureTimeoutError:
         raise HTTPException(504, "AI took too long. Your care records are unchanged.") from None
     except AIProviderError as exc:
-        detail = "AI is not configured in this environment." if exc.category == "missing configuration" else "AI is temporarily unavailable. Your care records are unchanged."
+        messages = {
+            "missing configuration": "AI is not configured in this environment.",
+            "invalid credentials": "The AI provider rejected this environment's credentials. Contact the workspace administrator.",
+            "unsupported model": "The configured AI model is unavailable. Contact the workspace administrator.",
+            "quota exhausted": "The AI provider quota is exhausted. Try later or ask the administrator to check the project's quota.",
+            "rate limited": "The AI provider is limiting requests. Please wait before trying again.",
+            "timeout": "The AI provider timed out. Please try again.",
+        }
+        category = exc.category if exc.category in messages else "provider unavailable"
+        logger.warning("AI workspace provider failure category=%s", category)
+        detail = messages.get(category, "AI is temporarily unavailable. Your care records are unchanged.")
         raise HTTPException(503, detail) from None
     except (ValueError, TypeError, HTTPException):
         raise HTTPException(502, "AI could not produce a draft grounded in your note. Your care records are unchanged. Try again, or clarify any unresolved details.") from None

@@ -33,7 +33,12 @@ from app import lifestyle_models  # Register the complete schema before fixture 
 # sqlite3's legacy DDL mode otherwise commits each table/index individually.
 # Keep the disposable schema setup in one durable transaction; application
 # transactions and production database configuration are unchanged.
+assert engine.dialect.name == "sqlite" and Path(engine.url.database).resolve().parent == Path(scratch.name).resolve()
 with engine.connect() as connection:
+    # Browser requests overlap reads and writes. WAL prevents a reader from
+    # blocking a writer's commit in this throwaway fixture database. Never
+    # change the journal mode of a development or production datastore here.
+    assert connection.exec_driver_sql("PRAGMA journal_mode=WAL").scalar_one() == "wal"
     connection.exec_driver_sql("BEGIN")
     Base.metadata.create_all(bind=connection)
     connection.commit()

@@ -771,64 +771,7 @@ aside nav a[aria-current="page"] > div {
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mc-brand) 22%, transparent);
 }
 
-.mc-ai-nav-item {
-  isolation: isolate;
-  overflow: hidden;
-}
-
-.mc-ai-nav-item::before {
-  position: absolute;
-  inset: 1px;
-  z-index: 0;
-  border-radius: 11px;
-  background: linear-gradient(
-    115deg,
-    color-mix(in srgb, var(--mc-brand) 20%, transparent),
-    color-mix(in srgb, var(--mc-highlight) 18%, transparent),
-    color-mix(in srgb, var(--mc-accent-teal) 18%, transparent),
-    color-mix(in srgb, var(--mc-rose) 16%, transparent)
-  );
-  content: "";
-  opacity: 0;
-  transform: translateX(-18%);
-  transition: opacity 180ms ease, transform 420ms ease;
-}
-
-.mc-ai-nav-item::after {
-  position: absolute;
-  inset: 1px;
-  z-index: 0;
-  border-radius: 11px;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mc-brand) 26%, transparent);
-  content: "";
-  opacity: 0;
-  transition: opacity 180ms ease, box-shadow 180ms ease;
-}
-
-.mc-ai-nav-item:hover::before,
-.mc-ai-nav-item:focus-visible::before,
-.mc-ai-nav-item-active::before {
-  opacity: 1;
-  transform: translateX(0);
-}
-
-.mc-ai-nav-item:hover::after,
-.mc-ai-nav-item:focus-visible::after,
-.mc-ai-nav-item-active::after {
-  opacity: 1;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mc-brand) 42%, transparent), 0 0 18px color-mix(in srgb, var(--mc-brand) 16%, transparent);
-}
-
-.mc-ai-nav-item-active {
-  color: var(--mc-text) !important;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .mc-ai-nav-item::before,
-  .mc-ai-nav-item::after {
-    transition: none;
-  }
-}
+.mc-ai-nav-item { isolation: isolate; overflow: hidden; }
 
 main section[class*="rounded-"] {
   border-color: var(--mc-border);
@@ -937,10 +880,12 @@ html[data-theme="dark"] :is(button, a)[class~="bg-[#6D3A5B]"] {
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mc-brand) 28%, transparent);
 }
 
-.mc-ai-nav-item-active:not(:hover):not(:focus-within) {
+.mc-ai-nav-item-active {
+  color: var(--mc-text);
   background: linear-gradient(115deg,
-    color-mix(in srgb, var(--mc-brand) 22%, var(--mc-surface)),
-    color-mix(in srgb, var(--mc-highlight) 12%, var(--mc-surface)));
+    color-mix(in srgb, var(--mc-brand) 24%, var(--mc-surface)),
+    color-mix(in srgb, #6366f1 20%, var(--mc-surface)),
+    color-mix(in srgb, #4285f4 16%, var(--mc-surface)));
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mc-brand) 44%, transparent);
 }
 
@@ -974,7 +919,11 @@ html[data-theme="dark"] :is(button, a)[class~="bg-[#6D3A5B]"] {
   position: relative;
   isolation: isolate;
   z-index: 0;
+  overflow: hidden;
 }
+
+.mc-ai-tabs button { color: var(--mc-text); }
+.mc-ai-tabs button[aria-pressed="true"] { color: var(--mc-text); }
 
 /* Gradient border: transparent middle, animated color ring. */
 .mc-ai-nav-item::before,
@@ -982,7 +931,7 @@ html[data-theme="dark"] :is(button, a)[class~="bg-[#6D3A5B]"] {
 .mc-ai-generate::before {
   content: "";
   position: absolute;
-  inset: -1px;
+  inset: 0;
   border-radius: inherit;
   padding: 2px;
   background: conic-gradient(
@@ -1003,7 +952,7 @@ html[data-theme="dark"] :is(button, a)[class~="bg-[#6D3A5B]"] {
   pointer-events: none;
   opacity: 0;
   transition: opacity 180ms ease;
-  z-index: 2;
+  z-index: -1;
 }
 
 /* Soft halo follows the gradient. */
@@ -1012,8 +961,12 @@ html[data-theme="dark"] :is(button, a)[class~="bg-[#6D3A5B]"] {
 .mc-ai-generate::after {
   content: "";
   position: absolute;
-  inset: -3px;
+  inset: 0;
   border-radius: inherit;
+  padding: 2px;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
   background: conic-gradient(
     from var(--mc-ai-spin),
     #4285f4,
@@ -1028,7 +981,7 @@ html[data-theme="dark"] :is(button, a)[class~="bg-[#6D3A5B]"] {
   opacity: 0;
   pointer-events: none;
   transition: opacity 180ms ease;
-  z-index: -1;
+  z-index: -2;
 }
 
 /* Activate only on hover / focus. */
@@ -1037,14 +990,18 @@ html[data-theme="dark"] :is(button, a)[class~="bg-[#6D3A5B]"] {
 .mc-ai-nav-item:focus-within::before,
 .mc-ai-nav-item:focus-within::after,
 .mc-ai-tabs button:hover:not(:disabled)::before,
-.mc-ai-tabs button:hover:not(:disabled)::after,
 .mc-ai-tabs button:focus-visible::before,
-.mc-ai-tabs button:focus-visible::after,
 .mc-ai-generate:hover:not(:disabled)::before,
-.mc-ai-generate:hover:not(:disabled)::after,
-.mc-ai-generate:focus-visible::before,
-.mc-ai-generate:focus-visible::after {
+.mc-ai-generate:focus-visible::before {
   opacity: 1;
+  animation: mc-ai-aura-spin 2.8s linear infinite;
+}
+
+.mc-ai-tabs button:hover:not(:disabled)::after,
+.mc-ai-tabs button:focus-visible::after,
+.mc-ai-generate:hover:not(:disabled)::after,
+.mc-ai-generate:focus-visible::after {
+  opacity: .18;
   animation: mc-ai-aura-spin 2.8s linear infinite;
 }
 

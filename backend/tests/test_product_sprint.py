@@ -148,6 +148,26 @@ def test_ai_rejection_and_handoff_approval(client, patient_workspace, monkeypatc
     assert created.status_code == 201 and created.json()["status"] == "Prepared"
     assert client.post("/api/handoffs", headers=auth, json={**payload, "human_approved": True}).json()["id"] == created.json()["id"]
 
+    conflicting = client.post(
+        "/api/handoffs",
+        headers=auth,
+        json={
+            **payload,
+            "title": "Different responsibility",
+            "human_approved": True,
+        },
+    )
+    assert conflicting.status_code == 409
+    assert "already has a handoff" in conflicting.json()["detail"]
+
+    original = client.get(
+        f"/api/handoffs/{created.json()['id']}",
+        headers=auth,
+        params={"actor_caregiver_id": account["caregiver_id"]},
+    )
+    assert original.status_code == 200
+    assert original.json()["title"] == "Reviewed handoff"
+
 
 def test_ai_limits_and_revoked_permission(client, patient_workspace, monkeypatch):
     auth, account, _, caregiver, _ = patient_workspace
