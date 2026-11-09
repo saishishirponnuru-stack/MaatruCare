@@ -88,7 +88,7 @@ export default function ProfilePage() {
               {displayName}
             </h1>
             <p className="mt-2 max-w-xl text-sm leading-6 text-[#756D72]">
-              Your profile and coordination snapshot.
+              Your profile and coordination snapshot. Care journey: {account?.patient?.name?.trim() || "Mother's name not available"}.
             </p>
           </div>
 

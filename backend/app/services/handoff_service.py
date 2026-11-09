@@ -75,6 +75,22 @@ def create_handoff(db: Session, *, patient_id: int, title: str, from_caregiver_i
         from .ai_draft_service import validate_handoff_approval
         existing = validate_handoff_approval(db, ai_draft_id, human_approved, patient_id)
         if existing is not None:
+            same_request = (
+                existing.patient_id == patient_id
+                and existing.from_caregiver_id == sender.id
+                and existing.to_caregiver_id == recipient.id
+                and existing.title == title.strip()
+                and existing.reason == reason.strip()
+                and existing.context == context
+                and existing.related_task_id == related_task_id
+            )
+            if not same_request:
+                raise HTTPException(
+                    409,
+                    "This AI draft already has a handoff with different details. "
+                    "No new handoff was created. Review the existing handoff "
+                    "before making another assignment.",
+                )
             return existing
     handoff = CareHandoff(patient_id=patient_id, title=title.strip(), from_caregiver_id=sender.id, to_caregiver_id=recipient.id, reason=reason.strip(), status=PREPARED, context=context, related_task_id=related_task_id, ai_draft_id=ai_draft_id)
     try:

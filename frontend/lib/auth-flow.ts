@@ -38,6 +38,50 @@ export function callbackUrl(origin: string, next?: string | null, recovery = fal
   return url.toString();
 }
 
+// Keep the provider callback byte-for-byte equal to the allowlisted URL.
+// This is routing intent, not OAuth state: Supabase still owns PKCE/state and
+// resolveAuthLink must verify the exchanged session before using this hint.
+export const googleIntentKey = "maatru-care-google-return:v1";
+type RoutingStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
+const intentLifetime = 10 * 60 * 1000;
+
+export function clearGoogleIntent(storage: RoutingStorage) {
+  try { storage.removeItem(googleIntentKey); } catch { /* A routing hint cannot confer access. */ }
+}
+
+export async function beginGoogleOAuth(auth: Auth, origin: string, next: string, storage: RoutingStorage) {
+  const callback = new URL("/auth/callback", origin);
+  try {
+    storage.setItem(googleIntentKey, JSON.stringify({origin: callback.origin, next: safeAuthNext(next), expires: Date.now() + intentLifetime}));
+  } catch {
+    clearGoogleIntent(storage);
+    throw new Error("Your browser could not save the sign-in destination. Allow session storage and try again.");
+  }
+  try {
+    const {data, error} = await auth.signInWithOAuth({provider: "google", options: {redirectTo: callback.toString()}});
+    if (error) rejected(error);
+    if (!data?.url) throw new Error("Google sign-in could not be started. Please try again.");
+  } catch (error) {
+    clearGoogleIntent(storage);
+    throw error;
+  }
+}
+
+export function googleCallbackDestination(href: string, fallback: string, storage: RoutingStorage, recovery = false) {
+  const url = new URL(href);
+  const safeFallback = safeAuthNext(fallback);
+  let raw: string | null = null;
+  try { raw = storage.getItem(googleIntentKey); } catch { /* Fall back to verified callback routing. */ }
+  clearGoogleIntent(storage);
+  // Existing email, recovery and older OAuth links keep their explicit routing.
+  if (recovery || url.searchParams.has("next") || url.pathname !== "/auth/callback" || !url.searchParams.has("code") || !raw) return safeFallback;
+  try {
+    const intent = JSON.parse(raw);
+    if (intent.origin !== url.origin || typeof intent.expires !== "number" || !Number.isFinite(intent.expires) || intent.expires <= Date.now() || intent.expires > Date.now() + intentLifetime || typeof intent.next !== "string") return safeFallback;
+    return safeAuthNext(intent.next);
+  } catch { return safeFallback; }
+}
+
 export function validateEmail(value: string) {
   const email = value.trim().toLowerCase();
   if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Enter a valid email address.");

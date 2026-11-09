@@ -75,7 +75,7 @@ export default function Sidebar({
         </button>
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-4 py-4 lg:py-5">
+      <nav aria-label="Care navigation" className="mc-sidebar-nav flex-1 overflow-y-auto px-4 py-4 lg:py-5">
         <div className="mb-3 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--mc-muted)]">
           Care
         </div>

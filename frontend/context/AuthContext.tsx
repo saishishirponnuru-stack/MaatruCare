@@ -12,7 +12,7 @@ import {
 } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { ApiError, api, type ApiAuthAccount } from "@/lib/api";
-import { authDestination, authErrorMessage, callbackUrl, changePassword, hasAuthLink, registerWithEmail, requestRecovery, resendConfirmation, resolveAuthLink, safeAuthNext, signInWithEmail, signOutCurrentSession } from "@/lib/auth-flow";
+import { authDestination, beginGoogleOAuth, clearGoogleIntent, googleCallbackDestination, changePassword, hasAuthLink, registerWithEmail, requestRecovery, resendConfirmation, resolveAuthLink, safeAuthNext, signInWithEmail, signOutCurrentSession } from "@/lib/auth-flow";
 import {
   getSupabaseBrowserClient,
   isSupabaseConfigured,
@@ -186,6 +186,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [status, account, accountReady, authError, pathname, router]);
 
   const clearIdentity = useCallback(() => {
+    try { clearGoogleIntent(window.sessionStorage); } catch { /* Sign-out remains available with blocked browser storage. */ }
     redirectIntentRef.current=null;subjectRef.current = null; loadedSubjectRef.current = null; accountRequestRef.current = null;
     setAccount(null); setAccountReady(false); setEmail(null); setSuggestedName(""); setAuthError(""); setStatus("unauthenticated");
   }, []);
@@ -193,7 +194,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const resolveLinkOnce = useCallback(async (href: string) => {
     if (!client) throw new Error("Authentication is not configured.");
     if (callbackRequestRef.current?.href !== href) {
-      callbackRequestRef.current = {href, promise: resolveAuthLink(client.auth, href)};
+      const promise = resolveAuthLink(client.auth, href).then(result => {
+        let next = result.next;
+        try { next = googleCallbackDestination(href, result.next, window.sessionStorage, result.recovery); } catch { /* Keep the verified callback destination. */ }
+        return {...result, next};
+      }).catch(error => {
+        try { clearGoogleIntent(window.sessionStorage); } catch { /* Do not mask verification failures. */ }
+        throw error;
+      });
+      callbackRequestRef.current = {href, promise};
     }
     return callbackRequestRef.current.promise;
   }, [client]);
@@ -205,6 +214,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     suggestedName,
     async signIn(signInEmail, password, nextPath = "/dashboard") {
       if (!client) throw new Error("Authentication is not configured.");
+      try { clearGoogleIntent(window.sessionStorage); } catch { /* Email sign-in does not use a Google routing hint. */ }
       setAuthError("");redirectIntentRef.current=safeAuthNext(nextPath);
       const session = await signInWithEmail(client.auth, signInEmail, password);
       const current = await refreshAccount();
@@ -214,8 +224,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     async signInWithGoogle(nextPath = "/dashboard") {
       if (!client) throw new Error("Authentication is not configured.");
-      const {error} = await client.auth.signInWithOAuth({provider:"google",options:{redirectTo:callbackUrl(window.location.origin,safeAuthNext(nextPath))}});
-      if (error) throw new Error(authErrorMessage(error));
+      let storage: Storage;
+      try { storage = window.sessionStorage; }
+      catch { throw new Error("Your browser could not save the sign-in destination. Allow session storage and try again."); }
+      await beginGoogleOAuth(client.auth, window.location.origin, nextPath, storage);
     },
     async signUp(signUpEmail, password, confirmation, name, role, invitationToken) {
       if (!client) throw new Error("Authentication is not configured.");

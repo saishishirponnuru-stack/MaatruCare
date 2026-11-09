@@ -16,6 +16,7 @@ from ..database import get_db
 from ..models import AIDraft, Task
 from ..ai_schemas import WorkspaceRequest, WorkspaceOutput, DraftReview
 from ..services.ai_service import generate_workspace
+from ..services.ai_grounding import verify_workspace
 from ..services.ai_draft_service import own_draft
 from ..services.access_service import get_active_caregiver, require_permission
 from ..services.audit_service import record_audit
@@ -172,17 +173,7 @@ def workspace(payload: WorkspaceRequest, request: Request, db: Session = Depends
     future.add_done_callback(lambda _: _workspace_capacity.release())
     try:
         output = WorkspaceOutput.model_validate(future.result(timeout=25))
-        for fact in [*output.facts, *output.responsibilities, *output.suggestions]:
-            if fact.source_quote not in payload.note:
-                raise ValueError("Unsupported source reference")
-        for value in [*output.dates, *output.times, *output.people]:
-            if not value or value not in payload.note:
-                raise ValueError("Unsupported extracted fact")
-        for suggestion in output.suggestions:
-            if suggestion.assignee_name and suggestion.assignee_name not in payload.note:
-                raise ValueError("Unsupported assignee")
-            if suggestion.due_date and suggestion.due_date.isoformat() not in payload.note:
-                raise ValueError("Ambiguous date requires human clarification")
+        verify_workspace(output, payload.note)
         screen_note(json.dumps(output.model_dump(mode="json"), ensure_ascii=False))
     except FutureTimeoutError:
         raise HTTPException(504, "AI took too long. Your care records are unchanged.") from None
@@ -190,7 +181,7 @@ def workspace(payload: WorkspaceRequest, request: Request, db: Session = Depends
         detail = "AI is not configured in this environment." if exc.category == "missing configuration" else "AI is temporarily unavailable. Your care records are unchanged."
         raise HTTPException(503, detail) from None
     except (ValueError, TypeError, HTTPException):
-        raise HTTPException(502, "The response could not be verified against your note. Edit the note and try again.") from None
+        raise HTTPException(502, "AI could not produce a draft grounded in your note. Your care records are unchanged. Try again, or clarify any unresolved details.") from None
     except Exception:
         logger.warning("AI workspace generation failed")
         raise HTTPException(503, "AI is temporarily unavailable. Your care records are unchanged.") from None

@@ -14,6 +14,14 @@
 .mc-field { display: flex; flex-direction: column; gap: 7px; margin-bottom: 16px; font-size: .85rem; font-weight: 600; min-width: 0; }
 .mc-field input, .mc-field select, .mc-field textarea, .mc-input { width: 100%; min-height: 42px; padding: 10px 12px; border: 1px solid var(--mc-border); border-radius: 10px; color: var(--mc-text); background: var(--mc-surface-muted); font-size: .85rem; font-weight: 400; }
 .mc-field textarea { min-height: 100px; resize: vertical; }
+.mc-search-field { position: relative; display: block; min-width: 0; }
+.mc-search-field > svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--mc-muted); pointer-events: none; }
+.mc-search-field > .mc-input { padding-inline-start: 40px; }
+.mc-sidebar-nav { min-height: 0; scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--mc-muted) 35%, transparent) transparent; scrollbar-gutter: stable; overscroll-behavior-y: contain; }
+.mc-sidebar-nav::-webkit-scrollbar { width: 6px; }
+.mc-sidebar-nav::-webkit-scrollbar-track { background: transparent; }
+.mc-sidebar-nav::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--mc-muted) 35%, transparent); border-radius: 6px; }
+.mc-sidebar-nav:hover::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--mc-muted) 60%, transparent); }
 select option { color: var(--mc-text); background: var(--mc-surface); }
 .mc-message { margin: 16px 0; padding: 12px 16px; background: color-mix(in srgb, var(--mc-success) 8%, var(--mc-surface)); border: 1px solid color-mix(in srgb, var(--mc-success) 30%, transparent); border-radius: 12px; font-size: .85rem; color: var(--mc-text); }
 .mc-message--error { border-color: var(--mc-danger); background: color-mix(in srgb, var(--mc-danger) 8%, var(--mc-surface)); }
@@ -861,13 +869,201 @@ html[data-theme="dark"] :is(button, a)[class~="bg-[#6D3A5B]"] {
 .mc-logo { display:inline-flex; align-items:center; gap:9px; height:44px; min-width:0; color:var(--mc-text); }
 .mc-logo-symbol { display:block; width:44px; height:44px; flex-shrink:0; object-fit:contain; }
 .mc-logo-copy { display:flex; flex-direction:column; min-width:0; gap:2px; }
-.mc-logo-wordmark { font-family:"Segoe UI",Aptos,system-ui,sans-serif; font-size:21px; font-weight:700; line-height:1.15; letter-spacing:-0.035em; white-space:nowrap; }
+.mc-logo-wordmark { color:var(--mc-text); font-family:"Segoe UI",Aptos,system-ui,sans-serif; font-size:21px; font-weight:700; line-height:1.15; letter-spacing:-0.035em; white-space:nowrap; }
 .mc-logo-wordmark > span { color:var(--mc-brand); }
 .mc-logo-subtitle { color:var(--mc-muted); font-size:11px; line-height:1.3; white-space:nowrap; }
 .mc-logo--compact { height:36px; gap:7px; }
 .mc-logo--compact .mc-logo-symbol { width:36px; height:36px; }
 .mc-logo--compact .mc-logo-wordmark { font-size:13px; letter-spacing:-0.01em; }
-html[data-theme="dark"] .mc-logo-symbol, .mc-logo--on-dark .mc-logo-symbol { filter:brightness(1.65) saturate(0.9); }
 .mc-logo--on-dark .mc-logo-wordmark { color:#fff; }
 .mc-logo--on-dark .mc-logo-wordmark > span { color:#e6c6ee; }
 .mc-logo--on-dark .mc-logo-subtitle { color:#e2d5e6; }
+
+/* MaatruCare original horizontal branding */
+.mc-logo--full {
+  display: inline-flex;
+  width: min(100%, 250px);
+  height: auto;
+  min-height: 58px;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 4px 8px;
+  border-radius: 12px;
+}
+
+.mc-logo-full-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+[data-theme="dark"] .mc-logo--full,
+.mc-logo--full.mc-logo--on-dark {
+  background: rgba(255, 255, 255, 0.96);
+}
+/* MaatruCare theme-aware logo */
+
+.mc-logo-light {
+  display: block;
+}
+
+.mc-logo-dark {
+  display: none;
+}
+
+[data-theme="dark"] .mc-logo-light {
+  display: none;
+}
+
+[data-theme="dark"] .mc-logo-dark {
+  display: block;
+}
+
+/* Remove the white logo background in dark mode */
+[data-theme="dark"] .mc-logo--full {
+  background: transparent;
+}
+/* ==========================================================
+   MAATRUCARE AI ASSIST — ROTATING AURA BORDER
+   ========================================================== */
+
+/* Idle identity is independent of the approved hover/focus aura below. */
+.mc-ai-nav-item:not(:hover):not(:focus-within) {
+  background: linear-gradient(115deg,
+    color-mix(in srgb, var(--mc-brand) 14%, var(--mc-surface)),
+    color-mix(in srgb, var(--mc-highlight) 8%, var(--mc-surface)));
+  color: var(--mc-text);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mc-brand) 28%, transparent);
+}
+
+.mc-ai-nav-item-active:not(:hover):not(:focus-within) {
+  background: linear-gradient(115deg,
+    color-mix(in srgb, var(--mc-brand) 22%, var(--mc-surface)),
+    color-mix(in srgb, var(--mc-highlight) 12%, var(--mc-surface)));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mc-brand) 44%, transparent);
+}
+
+.mc-ai-nav-item:not(:hover):not(:focus-within) .mc-feature-icon {
+  color: var(--mc-brand);
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--mc-brand) 22%, var(--mc-surface)),
+    color-mix(in srgb, var(--mc-highlight) 14%, var(--mc-surface)));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mc-brand) 24%, transparent);
+}
+
+/* The older active rule must not leave the multicolor aura visible at rest. */
+.mc-ai-nav-item:not(:hover):not(:focus-within)::before,
+.mc-ai-nav-item:not(:hover):not(:focus-within)::after {
+  opacity: 0;
+}
+
+@property --mc-ai-spin {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes mc-ai-aura-spin {
+  to { --mc-ai-spin: 360deg; }
+}
+
+.mc-ai-nav-item,
+.mc-ai-tabs button,
+.mc-ai-generate {
+  position: relative;
+  isolation: isolate;
+  z-index: 0;
+}
+
+/* Gradient border: transparent middle, animated color ring. */
+.mc-ai-nav-item::before,
+.mc-ai-tabs button::before,
+.mc-ai-generate::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 2px;
+  background: conic-gradient(
+    from var(--mc-ai-spin),
+    #4285f4 0deg,
+    #8b5cf6 65deg,
+    #ec4899 135deg,
+    #f97373 205deg,
+    #fbbf24 270deg,
+    #34a8a0 320deg,
+    #4285f4 360deg
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 180ms ease;
+  z-index: 2;
+}
+
+/* Soft halo follows the gradient. */
+.mc-ai-nav-item::after,
+.mc-ai-tabs button::after,
+.mc-ai-generate::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: inherit;
+  background: conic-gradient(
+    from var(--mc-ai-spin),
+    #4285f4,
+    #8b5cf6,
+    #ec4899,
+    #f97373,
+    #fbbf24,
+    #34a8a0,
+    #4285f4
+  );
+  filter: blur(9px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+  z-index: -1;
+}
+
+/* Activate only on hover / focus. */
+.mc-ai-nav-item:hover::before,
+.mc-ai-nav-item:hover::after,
+.mc-ai-nav-item:focus-within::before,
+.mc-ai-nav-item:focus-within::after,
+.mc-ai-tabs button:hover:not(:disabled)::before,
+.mc-ai-tabs button:hover:not(:disabled)::after,
+.mc-ai-tabs button:focus-visible::before,
+.mc-ai-tabs button:focus-visible::after,
+.mc-ai-generate:hover:not(:disabled)::before,
+.mc-ai-generate:hover:not(:disabled)::after,
+.mc-ai-generate:focus-visible::before,
+.mc-ai-generate:focus-visible::after {
+  opacity: 1;
+  animation: mc-ai-aura-spin 2.8s linear infinite;
+}
+
+/* Keep the original button surfaces and text readable. */
+.mc-ai-nav-item:hover,
+.mc-ai-tabs button:hover:not(:disabled),
+.mc-ai-generate:hover:not(:disabled) {
+  border-color: transparent !important;
+}
+
+/* Accessible fallback. */
+@media (prefers-reduced-motion: reduce) {
+  .mc-ai-nav-item::before,
+  .mc-ai-nav-item::after,
+  .mc-ai-tabs button::before,
+  .mc-ai-tabs button::after,
+  .mc-ai-generate::before,
+  .mc-ai-generate::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
